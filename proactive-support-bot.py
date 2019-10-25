@@ -1,6 +1,13 @@
-from slackeventsapi import SlackEventAdapter
+import logging
 import os
+
 import slack
+from slackeventsapi import SlackEventAdapter
+
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 # Our app's Slack Event Adapter for receiving actions via the Events API
@@ -14,26 +21,41 @@ client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 # Example responder to greetings
 @slack_events_adapter.on("app_mention")
 def handle_message(event_data):
-    print("handle_message")
-    message = event_data["event"]
-    print(message)
-    print(message.get('text'))
-    # If the incoming message contains "hi", then respond with a "Hello" message
-    if message.get("subtype") is None:
-        channel = message["channel"]
-        text = message.get('text')
+    logger.debug('handle_message', event_data)
+    message = event_data['event']
+    if message.get('subtype') is not None:
+        return  # https://api.slack.com/events/message#message_subtypes
+    text = message.get('text')
+    if not text:
+        return
+    command = text.split()[-1]  # FIXME: some way to reject earlier garbage
+    handler = globals().get('handle_{}'.format(command))
+    if not handler:
+        logger.info('no handler found for {!r}'.format(command))
+        return
+    response = handler(client=client, event=event_data)
+    if not response:
+        return
+    if response.get('ok'):
+        logger.debug(response)
+    else:
+        logger.error(response)
 
-        if "hi" in text:
-          message = "Hello <@%s>! :tada:" % message["user"]
-          response = client.chat_postMessage(
-            channel=channel,
-            text=message)
-          assert response["ok"]
-        elif "fileuploadtest" in message.get('text'):
-          response = client.files_upload(
-            channels=channel,
-            content="Hello, World")
-          assert response["ok"]
+
+def handle_hi(client, event):
+    message = event['event']
+    channel = event['event']['channel']
+    response = 'Hello <@{user}>! :tada:'.format(**message)
+    return client.chat_postMessage(
+        channel=channel,
+        text=response)
+
+def handle_fileuploadtest(client, event):
+    channel = event['event']['channel']
+    return client.files_upload(
+        channels=channel,
+        content="Hello, World")
+
 
 # Once we have our event listeners configured, we can start the
 # Flask server with the default `/events` endpoint on port 8080
