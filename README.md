@@ -12,14 +12,15 @@ Bot commands:
 
 
 ## Setup in OpenShift
-```
+
+```sh
 oc new-app https://github.com/<project>/proactive-support-bot.git \
   -e APP_FILE=proactive-support-bot.py \
   -e SLACK_SIGNING_SECRET=<credentials from https://api.slack.com/apps/XXXXX/general?> \
-  -e SLACK_BOT_TOKEN=<token from https://api.slack.com/apps/XXXXXX/install-on-team?>
-```
+  -e SLACK_BOT_TOKEN=<token from https://api.slack.com/apps/XXXXXX/install-on-team?> \
+  -e OCM_TOKEN=<offline access token from https://cloud.redhat.com/openshift/token >
 
-```
+```sh
 oc edit route proactive-support-bot
 (add the following to the spec)
   tls:

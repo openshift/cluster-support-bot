@@ -3,6 +3,7 @@ import logging
 import os
 import time
 
+import ocm
 import slack
 from slackeventsapi import SlackEventAdapter
 
@@ -22,6 +23,9 @@ slack_events_adapter = SlackEventAdapter(slack_signing_secret, "/slack/events")
 # Create a SlackClient for your bot to use for Web API requests
 client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 # slack_client = SlackClient(slack_bot_token)
+
+# Storing the OCM Token Globally
+ocm_token = os.environ['OCM_TOKEN']
 
 
 class HelpRequest(ValueError):
@@ -107,20 +111,34 @@ def handle_help(client, event, args=None, subparser=None):
     return client.chat_postMessage(channel=channel, text=message)
 
 
-def handle_hi(client, event, args=None):
-    message = event['event']
-    channel = event['event']['channel']
-    response = 'Hello <@{user}>! :tada:'.format(**message)
-    return client.chat_postMessage(
-        channel=channel,
-        text=response)
-
-
 def handle_fileuploadtest(client, event, args=None):
     channel = event['event']['channel']
     return client.files_upload(
         channels=channel,
         content="Hello, World")
+
+
+def handle_cluster(client, event, args=None):
+    channel = event['event']['channel']
+    cluster = args.cluster
+    try:
+        account = ocm.cluster_to_account(token=ocm_token, cluster=cluster)
+    except ValueError as error:
+        if len(error.args) == 1:
+            details = error.args[0]
+        else:
+            logger.error('unrecognized cluster_to_account error: {}'.format(error))
+            return
+
+        response = details.get('response')
+        if not response:
+            logger.error('cluster_to_account error had no request: {}'.format(error))
+        return client.chat_postMessage(
+                channel=channel,
+                text='Failed to find {}: {} -> {}'.format(cluster, response.url, response.status_code))
+    return client.chat_postMessage(
+            channel=channel,
+            text='Based on {0}, we found the Red Hat Customer Portal Account ID {1}'.format(cluster, account))
 
 
 parser = ErrorRaisingArgumentParser(
@@ -131,8 +149,9 @@ parser = ErrorRaisingArgumentParser(
 subparsers = parser.add_subparsers()
 help_parser = subparsers.add_parser('help', help='Show this help')
 help_parser.set_defaults(func=handle_help)
-hi_parser = subparsers.add_parser('hi', help='Say hello')
-hi_parser.set_defaults(func=handle_hi)
+cluster_parser = subparsers.add_parser('cluster', help='Summarize a cluster by ID')
+cluster_parser.add_argument('cluster', metavar='ID', nargs=1, help='The cluster ID')
+cluster_parser.set_defaults(func=handle_cluster)
 fileuploadtest_parser = subparsers.add_parser('fileuploadtest', help='Upload a dummy file to Slack')
 fileuploadtest_parser.set_defaults(func=handle_fileuploadtest)
 
