@@ -60,7 +60,7 @@ def handle_fileuploadtest(client, event):
 def handle_cluster(client, event):
     channel = event['event']['channel']
     cluster = event['event'].get('text').split()[-1]
-    account = ocm.cluster_to_account(os.environ['PYOCM_SECRETpyocm'], cluster)
+    account = ocm.cluster_to_account(os.environ['pyocm'], cluster)
     return client.chat_postMessage(
             channel=channel,
             text='Based on {0}, we found SFDC Account {1}'.format(cluster, account))
