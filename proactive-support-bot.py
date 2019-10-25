@@ -7,7 +7,7 @@ from slackeventsapi import SlackEventAdapter
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel(logger.DEBUG)
+logger.setLevel(logging.DEBUG)
 
 
 # Our app's Slack Event Adapter for receiving actions via the Events API
@@ -24,18 +24,18 @@ def handle_message(event_data):
     logger.debug('handle_message', event_data)
     message = event_data['event']
     if message.get('subtype') is not None:
-        continue  # https://api.slack.com/events/message#message_subtypes
+        return  # https://api.slack.com/events/message#message_subtypes
     text = message.get('text')
     if not text:
-        continue
+        return
     command = text.split()[-1]  # FIXME: some way to reject earlier garbage
     handler = globals().get('handle_{}'.format(command))
     if not handler:
         logger.info('no handler found for {!r}'.format(command))
-        continue
-    response = handler(client=client, event=event)
+        return
+    response = handler(client=client, event=event_data)
     if not response:
-        continue
+        return
     if response.get('ok'):
         logger.debug(response)
     else:
@@ -44,13 +44,14 @@ def handle_message(event_data):
 
 def handle_hi(client, event):
     message = event['event']
+    channel = event['event']['channel']
     response = 'Hello <@{user}>! :tada:'.format(**message)
     return client.chat_postMessage(
         channel=channel,
         text=response)
 
 def handle_fileuploadtest(client, event):
-    channel = message['event']['channel']
+    channel = event['event']['channel']
     return client.files_upload(
         channels=channel,
         content="Hello, World")
