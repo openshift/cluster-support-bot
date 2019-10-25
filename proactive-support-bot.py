@@ -27,7 +27,7 @@ client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 def handle_message(event_data):
     global recent_events
 
-    logger.debug('handle_message', event_data)
+    logger.debug('handle_message: {}'.format(event_data))
     message = event_data['event']
     if message.get('subtype') is not None:
         return  # https://api.slack.com/events/message#message_subtypes
