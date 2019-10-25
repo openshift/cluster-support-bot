@@ -1,6 +1,8 @@
 from slackeventsapi import SlackEventAdapter
 import os
 import slack
+from hydra.hydra import hydra_api as hydra
+from pyocm.pyocm import ocm_api as pyocm
 
 
 # Our app's Slack Event Adapter for receiving actions via the Events API
@@ -34,6 +36,35 @@ def handle_message(event_data):
             channels=channel,
             content="Hello, World")
           assert response["ok"]
+        elif message.get("subtype") is None and "get summary" in textlower():
+          cluster = text.split()[len(text.split())-1]
+          account = clusterToAccount(cluster)
+          if account:
+              response = client.chat_postMessage(
+                channel=channel,
+                text=account)
+          else:
+              response = client.chat_postMessage(
+                channel=channel,
+                text='Encountered an issue converting {0} into a SFDC Account'.format(cluster))
+              assert response["ok"]
+
+
+def clusterToAccount(cluster):
+    ocm_api = pyocm(token="PlaceHolderToken")
+    try:
+        subInfo = ocm_api.get_subs_by_cluster_id(cluster)
+    except Exception as e:
+        # should break out here as the clusterString was likely invalid
+        print('Turning a cluster uuid into more info failed\nMore details: {0}'.format(e))
+        return None
+    try:
+        accountInfo = ocm_api.get_account_by_creator(subInfo.get("items")[0].get("creator").get("id"))
+    except Exception as e:
+        print('Turning Sub details into account info failed\nMore details: {0}'.format(e))
+        return None
+    return accountInfo.get("organization").get("ebs_account_info")
+
 
 # Once we have our event listeners configured, we can start the
 # Flask server with the default `/events` endpoint on port 8080
