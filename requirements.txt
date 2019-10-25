@@ -1,2 +1,4 @@
 slackeventsapi>=2.1.0
 slackclient>=1.1.0
+-e git+https://github.com/TheDiemer/pyhydra.git
+-e git+https://github.com/TheDiemer/pyocm.git
