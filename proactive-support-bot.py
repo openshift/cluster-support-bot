@@ -19,13 +19,21 @@ def handle_message(event_data):
     print(message)
     print(message.get('text'))
     # If the incoming message contains "hi", then respond with a "Hello" message
-    if message.get("subtype") is None and "hi" in message.get('text'):
+    if message.get("subtype") is None:
         channel = message["channel"]
-        message = "Hello <@%s>! :tada:" % message["user"]
-        response = client.chat_postMessage(
-          channel=channel,
-          text=message)
-        assert response["ok"]
+        text = message.get('text')
+
+        if "hi" in text:
+          message = "Hello <@%s>! :tada:" % message["user"]
+          response = client.chat_postMessage(
+            channel=channel,
+            text=message)
+          assert response["ok"]
+        elif "fileuploadtest" in message.get('text'):
+          response = client.files_upload(
+            channels=channel,
+            content="Hello, World")
+          assert response["ok"]
 
 # Once we have our event listeners configured, we can start the
 # Flask server with the default `/events` endpoint on port 8080
