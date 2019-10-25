@@ -3,6 +3,7 @@ import os
 
 import slack
 from slackeventsapi import SlackEventAdapter
+import ocm
 
 
 logging.basicConfig()
@@ -56,6 +57,13 @@ def handle_fileuploadtest(client, event):
         channels=channel,
         content="Hello, World")
 
+def handle_cluster(client, event):
+    channel = event['event']['channel']
+    cluster = event['event'].get('text').split()[-1]
+    account = ocm.cluster_to_account(os.environ['PYOCM_SECRETpyocm'], cluster)
+    return client.chat_postMessage(
+            channel=channel,
+            text='Based on {0}, we found SFDC Account {1}'.format(cluster, account))
 
 # Once we have our event listeners configured, we can start the
 # Flask server with the default `/events` endpoint on port 8080
