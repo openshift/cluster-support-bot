@@ -1,8 +1,8 @@
-#!/bin/python
 import requests
 
+requests.packages.urllib3.disable_warnings()
+
 def call_ocm(endpoint, token, parameters=None):
-    requests.packages.urllib3.disable_warnings()
     r = requests.get("{}/{}".format("https://api.openshift.com/api/", endpoint),
             params=parameters, 
             headers = {

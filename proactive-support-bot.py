@@ -19,6 +19,9 @@ slack_events_adapter = SlackEventAdapter(slack_signing_secret, "/slack/events")
 client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 # slack_client = SlackClient(slack_bot_token)
 
+# Storing the OCM Token Globally
+ocm_token = os.environ['pyocm']
+
 # Example responder to greetings
 @slack_events_adapter.on("app_mention")
 def handle_message(event_data):
@@ -60,10 +63,10 @@ def handle_fileuploadtest(client, event):
 def handle_cluster(client, event):
     channel = event['event']['channel']
     cluster = event['event'].get('text').split()[-1]
-    account = ocm.cluster_to_account(os.environ['pyocm'], cluster)
+    account = ocm.cluster_to_account(token=ocm_token, cluster=cluster)
     return client.chat_postMessage(
             channel=channel,
-            text='Based on {0}, we found SFDC Account {1}'.format(cluster, account))
+            text='Based on {0}, we found the Red Hat Customer Portal Account ID {1}'.format(cluster, account))
 
 # Once we have our event listeners configured, we can start the
 # Flask server with the default `/events` endpoint on port 8080
