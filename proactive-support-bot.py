@@ -15,17 +15,15 @@ logger.setLevel(logging.DEBUG)
 
 recent_events = set()  # cache recent event timestamps
 
+ocm_client = ocm.Client(token=os.environ['OCM_TOKEN'])
 
 # Our app's Slack Event Adapter for receiving actions via the Events API
 slack_signing_secret = os.environ["SLACK_SIGNING_SECRET"]
 slack_events_adapter = SlackEventAdapter(slack_signing_secret, "/slack/events")
 
 # Create a SlackClient for your bot to use for Web API requests
-client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
+slack_client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 # slack_client = SlackClient(slack_bot_token)
-
-# Storing the OCM Token Globally
-ocm_token = os.environ['OCM_TOKEN']
 
 
 class HelpRequest(ValueError):
@@ -66,7 +64,8 @@ def handle_message(event_data):
     cutoff = time.time() - 60*60  # keep events for an hour
     recent_events = {timestamp for timestamp in recent_events if timestamp > cutoff}
 
-    user_args = text.split()[1:]  # split and drop the '<@{bot-id}>' prefix
+    user_arg_line, body = (text.strip()+'\n').split('\n', 1)
+    user_args = user_arg_line.split()[1:]  # split and drop the '<@{bot-id}>' prefix
     try:
         args = parser.parse_args(user_args)
     except HelpRequest as error:
@@ -78,7 +77,7 @@ def handle_message(event_data):
         if not handler:
             logger.info('no handler found for {!r}'.format(user_args))
             return
-        response = handler(client=client, event=event_data, args=args)
+        response = handler(slack_client=slack_client, event=event_data, args=args, body=body)
         if not response:
             return
         if response.get('ok'):
@@ -87,7 +86,7 @@ def handle_message(event_data):
             logger.error(response)
 
 
-def handle_parse_args_error(client, event, error):
+def handle_parse_args_error(slack_client, event, error):
     channel = event['event']['channel']
     if len(error.args) == 1:
         details = error.args[0]
@@ -100,45 +99,73 @@ def handle_parse_args_error(client, event, error):
         logger.error('parse_args error had no message: {}'.format(error))
         return
 
-    return client.chat_postMessage(channel=channel, text=message)
+    return slack_client.chat_postMessage(channel=channel, text=message)
 
 
-def handle_help(client, event, args=None, subparser=None):
+def handle_help(slack_client, event, args=None, body=None, subparser=None):
     channel = event['event']['channel']
     if not subparser:
         subparser = parser
     message = subparser.format_help()
-    return client.chat_postMessage(channel=channel, text=message)
+    return slack_client.chat_postMessage(channel=channel, text=message)
 
 
-def handle_fileuploadtest(client, event, args=None):
-    channel = event['event']['channel']
-    return client.files_upload(
-        channels=channel,
-        content="Hello, World")
-
-
-def handle_cluster(client, event, args=None):
+def handle_summary(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
     cluster = args.cluster
     try:
-        account = ocm.cluster_to_account(token=ocm_token, cluster=cluster)
+        summary = get_summary(cluster=cluster)
     except ValueError as error:
-        if len(error.args) == 1:
-            details = error.args[0]
-        else:
-            logger.error('unrecognized cluster_to_account error: {}'.format(error))
-            return
-
-        response = details.get('response')
-        if not response:
-            logger.error('cluster_to_account error had no request: {}'.format(error))
-        return client.chat_postMessage(
-                channel=channel,
-                text='Failed to find {}: {} -> {}'.format(cluster, response.url, response.status_code))
-    return client.chat_postMessage(
+        return slack_client.chat_postMessage(
             channel=channel,
-            text='Based on {0}, we found the Red Hat Customer Portal Account ID {1}'.format(cluster, account))
+            text='{} {}'.format(cluster, error))
+    return slack_client.chat_postMessage(channel=channel, text=summary)
+
+
+def handle_detail(slack_client, event, args=None, body=None):
+    channel = event['event']['channel']
+    cluster = args.cluster
+    try:
+        entries = [get_summary(cluster=cluster)]
+        comments = [{'body': 'FIXME-comment-2-body'}, {'body': 'FIXME-comment-1-body'}]  # inverse chronological order
+        entries.extend([comment['body'] for comment in comments])  # FIXME: format with author and date, not just bodies
+    except ValueError as error:
+        return slack_client.chat_postMessage(
+            channel=channel,
+            text='{} {}'.format(cluster, error))
+    return slack_client.files_upload(channels=channel, content='\n\n'.join(entries))
+
+
+def get_summary(cluster):
+    lines = ['Cluster {}'.format(cluster)]
+    subscriptions = ocm_client.subscriptions(cluster=cluster)
+    if subscriptions.get('size') != 1:
+        raise ValueError('should have one subscription, not {size}'.format(**subscriptions))
+    subscription = subscriptions['items'][0]
+    lines.append('Subscription {id} ({status}, entitlement {entitlement_status})'.format(**subscription))
+    creator_id = subscription.get('creator', {}).get('id')
+    if not creator_id:
+        raise ValueError('subscription has no creator ID: {}'.format(subscription))
+    creator = ocm_client.accounts(id=creator_id)
+    logger.debug('account: {}'.format(creator))  # so devs can see what other information is available
+    lines.append('Created by Red Hat Customer Portal Account ID {organization[ebs_account_id]} at {subscription[created_at]}'.format(subscription=subscription, **creator))
+    lines.extend([
+        'FIXME: summary subject',
+        'FIXME: summary body',
+    ])
+    return '\n'.join(lines)
+
+
+def handle_set_summary(slack_client, event, args=None, body=None):
+    channel = event['event']['channel']
+    cluster = args.cluster
+    return slack_client.chat_postMessage(channel=channel, text='FIXME: set {} summary to:\n{}'.format(cluster, body))
+
+
+def handle_comment(slack_client, event, args=None, body=None):
+    channel = event['event']['channel']
+    cluster = args.cluster
+    return slack_client.chat_postMessage(channel=channel, text='FIXME: comment on {}:\n{}'.format(cluster, body))
 
 
 parser = ErrorRaisingArgumentParser(
@@ -149,12 +176,18 @@ parser = ErrorRaisingArgumentParser(
 subparsers = parser.add_subparsers()
 help_parser = subparsers.add_parser('help', help='Show this help')
 help_parser.set_defaults(func=handle_help)
-cluster_parser = subparsers.add_parser('cluster', help='Summarize a cluster by ID')
-cluster_parser.add_argument('cluster', metavar='ID', nargs=1, help='The cluster ID')
-cluster_parser.set_defaults(func=handle_cluster)
-fileuploadtest_parser = subparsers.add_parser('fileuploadtest', help='Upload a dummy file to Slack')
-fileuploadtest_parser.set_defaults(func=handle_fileuploadtest)
-
+summary_parser = subparsers.add_parser('summary', help='Summarize a cluster by ID')
+summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+summary_parser.set_defaults(func=handle_summary)
+set_summary_parser = subparsers.add_parser('set-summary', help='Set (or edit) the cluster summary')
+set_summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+set_summary_parser.set_defaults(func=handle_set_summary)
+detail_parser = subparsers.add_parser('detail', help='Upload a file to Slack with the cluster summary and all comments')
+detail_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+detail_parser.set_defaults(func=handle_detail)
+comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID')
+comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+comment_parser.set_defaults(func=handle_comment)
 
 # Once we have our event listeners configured, we can start the
 # Flask server with the default `/events` endpoint on port 8080
