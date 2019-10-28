@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 import slack
 from slackeventsapi import SlackEventAdapter
@@ -8,6 +9,9 @@ from slackeventsapi import SlackEventAdapter
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+recent_events = set()  # cache recent event timestamps
 
 
 # Our app's Slack Event Adapter for receiving actions via the Events API
@@ -21,6 +25,8 @@ client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 # Example responder to greetings
 @slack_events_adapter.on("app_mention")
 def handle_message(event_data):
+    global recent_events
+
     logger.debug('handle_message', event_data)
     message = event_data['event']
     if message.get('subtype') is not None:
@@ -28,6 +34,16 @@ def handle_message(event_data):
     text = message.get('text')
     if not text:
         return
+
+    timestamp = float(message.get('ts', 0))
+    if timestamp in recent_events:  # high-resolution timestamps should have few false-negatives
+        logger.info('ignoring duplicate message: {}'.format(message))
+        return
+
+    recent_events.add(timestamp)  # add after check without a lock should be a small race window
+    cutoff = time.time() - 60*60  # keep events for an hour
+    recent_events = {timestamp for timestamp in recent_events if timestamp > cutoff}
+
     command = text.split()[-1]  # FIXME: some way to reject earlier garbage
     handler = globals().get('handle_{}'.format(command))
     if not handler:
