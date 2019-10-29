@@ -57,7 +57,7 @@ class Client(object):
             {
                 "type": n["type"],
                 "subject": n["subject"],
-                "active": n["isRetired"],
+                "isRetired": n["isRetired"],
                 "note": n["body"],
                 "id": n["id"],
             }
