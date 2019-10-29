@@ -47,22 +47,10 @@ class Client(object):
         return response.json()
 
     def get_account_notes(self, account):
-        notes = self._hydra(
-            fn=requests.get, endpoint="accounts/{}/notes".format(account)
+        return (
+            self._hydra(fn=requests.get, endpoint="accounts/{}/notes".format(account))
+            or []
         )
-        if notes is None:
-            return []
-
-        return [
-            {
-                "type": n["type"],
-                "subject": n["subject"],
-                "isRetired": n["isRetired"],
-                "note": n["body"],
-                "id": n["id"],
-            }
-            for n in notes
-        ]
 
     def post_account_notes(
         self,
