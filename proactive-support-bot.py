@@ -85,6 +85,7 @@ def handle_message(event_data):
 
 def handle_parse_args_error(slack_client, event, error):
     channel = event['event']['channel']
+    thread = event['event'].get('thread_ts', event['event']['ts'])
     if len(error.args) == 1:
         details = error.args[0]
     else:
@@ -96,19 +97,21 @@ def handle_parse_args_error(slack_client, event, error):
         logger.error('parse_args error had no message: {}'.format(error))
         return
 
-    return slack_client.chat_postMessage(channel=channel, text=message)
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
 
 
 def handle_help(slack_client, event, args=None, body=None, subparser=None):
     channel = event['event']['channel']
+    thread = event['event'].get('thread_ts', event['event']['ts'])
     if not subparser:
         subparser = parser
     message = subparser.format_help()
-    return slack_client.chat_postMessage(channel=channel, text=message)
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
 
 
 def handle_summary(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
+    thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
     try:
         summary = get_summary(cluster=cluster)
@@ -116,11 +119,12 @@ def handle_summary(slack_client, event, args=None, body=None):
         return slack_client.chat_postMessage(
             channel=channel,
             text='{} {}'.format(cluster, error))
-    return slack_client.chat_postMessage(channel=channel, text=summary)
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=summary)
 
 
 def handle_detail(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
+    thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
     try:
         entries = [get_summary(cluster=cluster)]
@@ -130,7 +134,7 @@ def handle_detail(slack_client, event, args=None, body=None):
         return slack_client.chat_postMessage(
             channel=channel,
             text='{} {}'.format(cluster, error))
-    return slack_client.files_upload(channels=channel, content='\n\n'.join(entries))
+    return slack_client.files_upload(channels=channel, thread_ts=thread, content='\n\n'.join(entries))
 
 
 def get_summary(cluster):
@@ -145,14 +149,16 @@ def get_summary(cluster):
 
 def handle_set_summary(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
+    thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
-    return slack_client.chat_postMessage(channel=channel, text='FIXME: set {} summary to:\n{}'.format(cluster, body))
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='FIXME: set {} summary to:\n{}'.format(cluster, body))
 
 
 def handle_comment(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
+    thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
-    return slack_client.chat_postMessage(channel=channel, text='FIXME: comment on {}:\n{}'.format(cluster, body))
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='FIXME: comment on {}:\n{}'.format(cluster, body))
 
 
 parser = ErrorRaisingArgumentParser(
