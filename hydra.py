@@ -74,18 +74,21 @@ class Client(object):
         subject="",
         noteType="General Info",
     ):
-        content = {"note": {}}
-        content["note"].update({"body": body})
+        content = {
+            "note": {
+                "body": body,
+                "needsReview": needsReview,
+                "retired": retired,
+                # There are 4 types of account notes:
+                # General Info, Key Notes, Next Steps, and Others
+                # Defaulting to "General Info" in order to default to a smaller note
+                # We likely will want to use "General Info" for most notes, but possibly use "Key Notes" for summaries
+                "type": noteType,
+                "subject": subject,
+            }
+        }
         if intendedReviewDate:
             content["note"].update({"intendedReviewDate": intendedReviewDate})
-        content["note"].update({"needsReview": needsReview})
-        content["note"].update({"retired": retired})
-        # There are 4 types of account notes:
-        # General Info, Key Notes, Next Steps, and Others
-        # Defaulting to "General Info" in order to default to a smaller note
-        # We likely will want to use "General Info" for most notes, but possibly use "Key Notes" for summaries
-        content["note"].update({"type": noteType})
-        content["note"].update({"subject": subject})
 
         return self._hydra(
             fn=requests.post,
