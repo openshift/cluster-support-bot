@@ -7,6 +7,8 @@ oc new-app https://github.com/<project>/cluster-support-bot.git \
   -e SLACK_BOT_TOKEN=<token from https://api.slack.com/apps/XXXXXX/install-on-team?> \
   -e HYDRA_USER=<FIXME: how to get one of these> \
   -e HYDRA_PASSWORD=<FIXME: how to get one of these> \
+  -e TELEMETRY_URI=https://FIXME.example.com/your-telemetry-query-uri \
+  -e TELEMETRY_TOKEN=<token from https://help.datahub.redhat.com/docs/interacting-with-telemetry-data> \
   -e DASHBOARD=https://FIXME.example.com/somewhere-users-can-see-cluster-details?cluster-id=
 ```
 
