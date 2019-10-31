@@ -3,6 +3,7 @@ import logging
 import os
 import time
 
+import hydra
 import slack
 from slackeventsapi import SlackEventAdapter
 
@@ -22,6 +23,9 @@ slack_events_adapter = SlackEventAdapter(slack_signing_secret, "/slack/events")
 slack_client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 # slack_client = SlackClient(slack_bot_token)
 
+hydra_client = hydra.Client(username=os.environ['HYDRA_USER'], password=os.environ['HYDRA_PASSWORD'])
+dashboard_base = os.environ['DASHBOARD']
+
 
 class HelpRequest(ValueError):
     "For jumping out of ErrorRaisingArgumentParser.print_help"
@@ -37,6 +41,10 @@ class ErrorRaisingArgumentParser(argparse.ArgumentParser):
 
     def print_help(self, file=None):
         raise HelpRequest({'parser': self})
+
+
+def dashboard_uri(cluster):
+    return '{}{}'.format(dashboard_base, cluster)
 
 
 # Example responder to greetings
@@ -114,10 +122,11 @@ def handle_summary(slack_client, event, args=None, body=None):
     thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
     try:
-        summary = get_summary(cluster=cluster, ebs_account=args.ebs_account)
+        summary, _ = get_summary(cluster=cluster, ebs_account=args.ebs_account)
     except ValueError as error:
         return slack_client.chat_postMessage(
             channel=channel,
+            thread_ts=thread,
             text='{} {}'.format(cluster, error))
     return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=summary)
 
@@ -127,38 +136,102 @@ def handle_detail(slack_client, event, args=None, body=None):
     thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
     try:
-        entries = [get_summary(cluster=cluster, ebs_account=args.ebs_account)]
-        comments = [{'body': 'FIXME-comment-2-body'}, {'body': 'FIXME-comment-1-body'}]  # inverse chronological order
-        entries.extend([comment['body'] for comment in comments])  # FIXME: format with author and date, not just bodies
+        summary, notes = get_summary(cluster=cluster, ebs_account=args.ebs_account)
     except ValueError as error:
         return slack_client.chat_postMessage(
             channel=channel,
+            thread_ts=thread,
             text='{} {}'.format(cluster, error))
+    entries = [summary]
+    for note in notes:
+        entries.append(
+            '{subject}\n{body}'.format(**note),
+        )
     return slack_client.files_upload(channels=channel, thread_ts=thread, content='\n\n'.join(entries))
 
 
+def get_notes(cluster, ebs_account):
+    if not ebs_account:
+        raise ValueError('set --ebs-account to the value from EBS Account in {}'.format(dashboard_uri(cluster=cluster)))
+    notes = hydra_client.get_account_notes(account=ebs_account)
+    summary = None
+    subject_prefix = 'Summary (cluster {}): '.format(cluster)
+    related_notes = []
+    for note in notes:
+        if note.get('isRetired'):
+            continue
+        if not note['subject'].startswith(subject_prefix):
+            if cluster in note['subject']:
+                related_notes.append(note)
+            continue
+        summary = note
+        break
+    return summary, related_notes
+
+
 def get_summary(cluster, ebs_account):
+    summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
     lines = ['Cluster {}'.format(cluster)]
     lines.append('Created by Red Hat Customer Portal Account ID {}'.format(ebs_account))
-    lines.extend([
-        'FIXME: summary subject',
-        'FIXME: summary body',
-    ])
-    return '\n'.join(lines)
+    if summary:
+        lines.extend([
+            'Dashboard: {}'.format(dashboard_uri(cluster=cluster)),
+            summary['subject'],
+            summary['body'],
+        ])
+    else:
+        lines.append('No summary')
+    return '\n'.join(lines), related_notes
 
 
 def handle_set_summary(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
     thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='FIXME: set {} summary to:\n{}'.format(cluster, body))
+    try:
+        subject, body = body.split('\n', 1)
+    except ValueError:  # subject with no body
+        subject, body = body, ''
+    subject_prefix = 'Summary (cluster {}): '.format(cluster)
+    try:
+        summary, related_notes = get_notes(cluster=cluster, ebs_account=args.ebs_account)
+        hydra_client.post_account_note(
+            account=args.ebs_account,
+            subject='{}{}'.format(subject_prefix, subject),
+            body=body,
+        )
+        if summary:
+            hydra_client.delete_account_note(account=args.ebs_account, noteID=summary['id'])
+    except ValueError as error:
+        return slack_client.chat_postMessage(
+            channel=channel,
+            thread_ts=thread,
+            text='{} {}'.format(cluster, error))
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='set {} summary to:\n{}\n{}'.format(cluster, subject, body))
 
 
 def handle_comment(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
     thread = event['event'].get('thread_ts', event['event']['ts'])
     cluster = args.cluster
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='FIXME: comment on {}:\n{}'.format(cluster, body))
+    if not args.ebs_account:
+        raise ValueError('set --ebs-account to the value from EBS Account in {}'.format(dashboard_uri(cluster=cluster)))
+    try:
+        subject, body = body.split('\n', 1)
+    except ValueError:  # subject with no body
+        subject, body = body, ''
+    try:
+        hydra_client.post_account_note(
+            account=args.ebs_account,
+            subject='cluster {}: {}'.format(cluster, subject),
+            body=body,
+        )
+    except ValueError as error:
+        return slack_client.chat_postMessage(
+            channel=channel,
+            thread_ts=thread,
+            text='{} {}'.format(cluster, error))
+    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='added comment on {}:\n{}\n{}'.format(cluster, subject, body))
 
 
 parser = ErrorRaisingArgumentParser(

@@ -52,7 +52,7 @@ class Client(object):
             or []
         )
 
-    def post_account_notes(
+    def post_account_note(
         self,
         account,
         body="",
@@ -84,7 +84,7 @@ class Client(object):
             payload=content,
         )
 
-    def delete_account_notes(self, account, noteID):
+    def delete_account_note(self, account, noteID):
         content = {"note": {"id": noteID}}
         return self._hydra(
             fn=requests.delete,
