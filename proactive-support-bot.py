@@ -111,7 +111,7 @@ def handle_summary(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
     cluster = args.cluster
     try:
-        summary = get_summary(cluster=cluster)
+        summary = get_summary(cluster=cluster, ebs_account=args.ebs_account)
     except ValueError as error:
         return slack_client.chat_postMessage(
             channel=channel,
@@ -123,7 +123,7 @@ def handle_detail(slack_client, event, args=None, body=None):
     channel = event['event']['channel']
     cluster = args.cluster
     try:
-        entries = [get_summary(cluster=cluster)]
+        entries = [get_summary(cluster=cluster, ebs_account=args.ebs_account)]
         comments = [{'body': 'FIXME-comment-2-body'}, {'body': 'FIXME-comment-1-body'}]  # inverse chronological order
         entries.extend([comment['body'] for comment in comments])  # FIXME: format with author and date, not just bodies
     except ValueError as error:
@@ -133,9 +133,9 @@ def handle_detail(slack_client, event, args=None, body=None):
     return slack_client.files_upload(channels=channel, content='\n\n'.join(entries))
 
 
-def get_summary(cluster):
+def get_summary(cluster, ebs_account):
     lines = ['Cluster {}'.format(cluster)]
-    lines.append('Created by Red Hat Customer Portal Account ID {}'.format('FIXME-portal-ID'))
+    lines.append('Created by Red Hat Customer Portal Account ID {}'.format(ebs_account))
     lines.extend([
         'FIXME: summary subject',
         'FIXME: summary body',
@@ -165,15 +165,19 @@ help_parser = subparsers.add_parser('help', help='Show this help')
 help_parser.set_defaults(func=handle_help)
 summary_parser = subparsers.add_parser('summary', help='Summarize a cluster by ID')
 summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
 summary_parser.set_defaults(func=handle_summary)
 set_summary_parser = subparsers.add_parser('set-summary', help='Set (or edit) the cluster summary')
 set_summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+set_summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
 set_summary_parser.set_defaults(func=handle_set_summary)
 detail_parser = subparsers.add_parser('detail', help='Upload a file to Slack with the cluster summary and all comments')
 detail_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+detail_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
 detail_parser.set_defaults(func=handle_detail)
 comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID')
 comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
+comment_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
 comment_parser.set_defaults(func=handle_comment)
 
 # Once we have our event listeners configured, we can start the
