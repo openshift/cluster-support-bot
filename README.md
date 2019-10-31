@@ -1,6 +1,6 @@
-# proactive-support-bot
+# Cluster-support Bot
 
-A slack bot for collaboration on per-cluster support issues.
+A Slack bot for collaboration on per-cluster support issues.
 
 Bot commands:
 
@@ -14,8 +14,8 @@ Bot commands:
 ## Setup in OpenShift
 
 ```sh
-oc new-app https://github.com/<project>/proactive-support-bot.git \
-  -e APP_FILE=proactive-support-bot.py \
+oc new-app https://github.com/<project>/cluster-support-bot.git \
+  -e APP_FILE=cluster-support-bot.py \
   -e SLACK_SIGNING_SECRET=<credentials from https://api.slack.com/apps/XXXXX/general?> \
   -e SLACK_BOT_TOKEN=<token from https://api.slack.com/apps/XXXXXX/install-on-team?> \
   -e HYDRA_USER=<FIXME: how to get one of these> \
@@ -24,7 +24,7 @@ oc new-app https://github.com/<project>/proactive-support-bot.git \
 ```
 
 ```sh
-oc edit route proactive-support-bot
+oc edit route cluster-support-bot
 (add the following to the spec)
   tls:
     insecureEdgeTerminationPolicy: Redirect
@@ -42,8 +42,8 @@ hit `Save changes` Slack will tell you to "reinstall" the app.
 ## Development Environment
  * go to slack.com and create a new workspace. For example, "< your name >"
  * create your account and set your password
- * go to https://api.slack.com/apps and create a new development app. Name can be something like "< yourname > proactive support". Choose the workspace you just created.
- * click on the app name and go to Bot Users. Add a development bot, for example, "proactive-support-bot"
+ * go to https://api.slack.com/apps and create a new development app. Name can be something like "< yourname > cluster support". Choose the workspace you just created.
+ * click on the app name and go to Bot Users. Add a development bot, for example, "cluster-support-bot"
  * click on OAuth & Permissions and install the bot to your workspace
  * copy the Bot User OAuth Access Token and export it to SLACK_BOT_TOKEN:
 
