@@ -1,3 +1,7 @@
+# License
+
+This project is distributed under [the Apache License Version 2.0][LICENSE].
+
 # Development Environment
 
 * go to slack.com and create a new workspace. For example, `< your name >`
