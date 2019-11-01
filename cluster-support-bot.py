@@ -192,6 +192,7 @@ def handle_set_summary(slack_client, event, args=None, body=None):
         subject, body = body.split('\n', 1)
     except ValueError:  # subject with no body
         subject, body = body, ''
+    body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip() 
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
         summary, related_notes = get_notes(cluster=cluster, ebs_account=args.ebs_account)
@@ -236,27 +237,27 @@ def handle_comment(slack_client, event, args=None, body=None):
 
 parser = ErrorRaisingArgumentParser(
     prog='Cluster support bot',
-    description='I help you collaborate on per-cluster support issues.',
+    description='I help you collaborate on per-cluster support issues ( https://github.com/openshift/cluster-support-bot/ ).',
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 subparsers = parser.add_subparsers()
-help_parser = subparsers.add_parser('help', help='Show this help')
+help_parser = subparsers.add_parser('help', help='Show this help.')
 help_parser.set_defaults(func=handle_help)
-summary_parser = subparsers.add_parser('summary', help='Summarize a cluster by ID')
-summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
-summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
+summary_parser = subparsers.add_parser('summary', help='Summarize a cluster by ID.')
+summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
+summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 summary_parser.set_defaults(func=handle_summary)
-set_summary_parser = subparsers.add_parser('set-summary', help='Set (or edit) the cluster summary')
-set_summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
-set_summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
+set_summary_parser = subparsers.add_parser('set-summary', help='Set (or edit) the cluster summary.  The line following the set-summary command will be used in the summary subject, and subsequent lines will be used in the summary body.')
+set_summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
+set_summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 set_summary_parser.set_defaults(func=handle_set_summary)
-detail_parser = subparsers.add_parser('detail', help='Upload a file to Slack with the cluster summary and all comments')
-detail_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
-detail_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
+detail_parser = subparsers.add_parser('detail', help='Upload a file to Slack with the cluster summary and all comments.')
+detail_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
+detail_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 detail_parser.set_defaults(func=handle_detail)
-comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID')
-comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID')
-comment_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner')
+comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID.  The line following the comment command will be used in the summary subject, and subsequent lines will be used in the summary body.')
+comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
+comment_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 comment_parser.set_defaults(func=handle_comment)
 
 # Once we have our event listeners configured, we can start the

@@ -2,56 +2,79 @@
 
 A Slack bot for collaboration on per-cluster support issues.
 
-Bot commands:
+## Explain available commands
 
-`help`              Show this help  
-`summary`           Summarize a cluster by ID  
-`set-summary`       Set (or edit) the cluster summary  
-`detail`            Upload a file to Slack with the cluster summary and all comments  
-`comment`           Add a comment on a cluster by ID  
+Ask the bot to explain avialable commands:
 
-
-## Setup in OpenShift
-
-```sh
-oc new-app https://github.com/<project>/cluster-support-bot.git \
-  -e APP_FILE=cluster-support-bot.py \
-  -e SLACK_SIGNING_SECRET=<credentials from https://api.slack.com/apps/XXXXX/general?> \
-  -e SLACK_BOT_TOKEN=<token from https://api.slack.com/apps/XXXXXX/install-on-team?> \
-  -e HYDRA_USER=<FIXME: how to get one of these> \
-  -e HYDRA_PASSWORD=<FIXME: how to get one of these> \
-  -e DASHBOARD=https://FIXME.example.com/somewhere-users-can-see-cluster-details?cluster-id=
+```
+@cluster-support-bot help
 ```
 
-```sh
-oc edit route cluster-support-bot
-(add the following to the spec)
-  tls:
-    insecureEdgeTerminationPolicy: Redirect
-    termination: edge
+The bot will respond with documentation for the available commands.
+
+## Get a support summary for a cluster
+
+When you notice a problem with a cluster, ask the bot for the current summary:
+
+```
+@cluster-support-bot summary --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
 ```
 
-Test by using `oc logs -f <podname>`to make sure it's running.  You can hit it
-with a browser to make sure the route is going through.
+The bot will respond with the current cluster summary, if any.
+If the existing summary looks good, you don't have to do anything else.
+If the summary looks stale or is missing, you can [update it](#set-a-support-summary-for-a-cluster).
+You can also [get the detailed history](#get-the-detailed-support-history-for-a-cluster) of support discussion for that cluster.
 
-Edit https://api.slack.com/apps/XXXXX/event-subscriptions? and update the
-request URL.  The url will be the route of the app + `/slack/events`.  You'll
-wait for a minute or so and it will verify the new URL is working.  Once you
-hit `Save changes` Slack will tell you to "reinstall" the app.
+## Set a support summary for a cluster
 
-## Development Environment
- * go to slack.com and create a new workspace. For example, "< your name >"
- * create your account and set your password
- * go to https://api.slack.com/apps and create a new development app. Name can be something like "< yourname > cluster support". Choose the workspace you just created.
- * click on the app name and go to Bot Users. Add a development bot, for example, "cluster-support-bot"
- * click on OAuth & Permissions and install the bot to your workspace
- * copy the Bot User OAuth Access Token and export it to SLACK_BOT_TOKEN:
+When the current summary is missing or stale, ask the bot to set a new summary:
 
-    export SLACK_BOT_TOKEN=xoxb-....
- * click on Basic Information and copy the Signing Secret and export it to SLACK_SIGNING_SECRET
+```
+@cluster-support-bot set-summary --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+This is your subject, e.g. Cluster appears to have misconfigured ingress DNS
+This is your body, e.g. The ingress operator has not been configured to manage DNS
+records for *.apps, but it is attempting to resolve them to see whether the user-provided
+records are functional for cluster components.  The attempted resolution is failing,
+so cluster admins should add the missing records.
+```
 
-    export SLACK_SIGNING_SECRET=1234....
- * start the bot. It must be publicly accessible, so use a public OpenShift or perhaps ngrok
- * click on Event Subscriptions. Turn on and paste in < your app's url >/slack/events  You should get a green check mark. If not, make sure the env variables above are set and correct.
- * subscribe to bot event "app_mention"
- * join a channel and add the bot. Message the bot "@< botname > hi" and you should get a response
+The bot will post the summary to the customer's eBusiness Suite (EBS) account, where support reprentatives can see it.
+
+You can also set the summary directly, by creating an account note whose subject begins with `Summary (cluster {cluster-ID}): ` and deleting any previous summary notes.
+An example subject would be:
+
+```
+Summary (cluster 09d9436d-52bb-48ba-9026-2ab047158ef6): Cluster appears to have misconfigured ingress DNS
+```
+
+You can also [comment on the cluster](#comment-on-a-cluster) without updating the summary.
+
+## Get the detailed support history for a cluster
+
+When you want more detail than the current summary provides, ask the bot for all the details:
+
+```
+@cluster-support-bot detail --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+```
+
+The bot will respond with the current cluster summary and any comments in reverse-chronological order.
+
+## Comment on a cluster
+
+When you want to add a comment about the cluster without updating the summary:
+
+```
+@cluster-support-bot comment --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+This is your subject, e.g. Opened support case about the missing *.apps DNS records
+This is your body, e.g. Case https://example.com/123  Customer says they may be
+able to dig into this tomorrow.
+```
+
+The bot will post the comment to the customer's eBusiness Suite (EBS) account, where support reprentatives can see it.
+
+You can also add a comment directly, by creating an account note whose subject includes the cluster ID.
+An example subject would be:
+
+```
+09d9436d-52bb-48ba-9026-2ab047158ef6 Opened support case about the missing *.apps DNS records
+```
