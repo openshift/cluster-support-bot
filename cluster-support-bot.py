@@ -192,6 +192,7 @@ def handle_set_summary(slack_client, event, args=None, body=None):
         subject, body = body.split('\n', 1)
     except ValueError:  # subject with no body
         subject, body = body, ''
+    body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip() 
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
         summary, related_notes = get_notes(cluster=cluster, ebs_account=args.ebs_account)
@@ -236,7 +237,7 @@ def handle_comment(slack_client, event, args=None, body=None):
 
 parser = ErrorRaisingArgumentParser(
     prog='Cluster support bot',
-    description='I help you collaborate on per-cluster support issues.',
+    description='I help you collaborate on per-cluster support issues ( https://github.com/openshift/cluster-support-bot/ ).',
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 subparsers = parser.add_subparsers()
