@@ -11,8 +11,11 @@ class RequestException(ValueError):
         self.response = response
 
     def __str__(self):
+        text = self.response.text
+        if len(text) > 160:
+            text = text[:157] + '...'
         return "failed {} -> {}\n{}".format(
-            self.response.url, self.response.status_code, self.response.text
+            self.response.url, self.response.status_code, text,
         )
 
 
