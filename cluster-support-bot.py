@@ -5,7 +5,6 @@ import time
 
 import hydra
 import slack
-from slackeventsapi import SlackEventAdapter
 
 
 logging.basicConfig()
@@ -13,15 +12,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+bot_mention = '<@{}> '.format(os.environ['BOT_ID'])
+
 recent_events = set()  # cache recent event timestamps
-
-# Our app's Slack Event Adapter for receiving actions via the Events API
-slack_signing_secret = os.environ["SLACK_SIGNING_SECRET"]
-slack_events_adapter = SlackEventAdapter(slack_signing_secret, "/slack/events")
-
-# Create a SlackClient for your bot to use for Web API requests
-slack_client = slack.WebClient(token=os.environ['SLACK_BOT_TOKEN'])
-# slack_client = SlackClient(slack_bot_token)
 
 hydra_client = hydra.Client(username=os.environ['HYDRA_USER'], password=os.environ['HYDRA_PASSWORD'])
 dashboard_base = os.environ['DASHBOARD']
@@ -47,20 +40,31 @@ def dashboard_uri(cluster):
     return '{}{}'.format(dashboard_base, cluster)
 
 
-# Example responder to greetings
-@slack_events_adapter.on("app_mention")
-def handle_message(event_data):
+@slack.RTMClient.run_on(event='message')
+def handle_message(**payload):
+    try:
+        _handle_message(payload=payload)
+    except Exception as e:
+        logger.debug('uncaught Exception in handle_message: {}'.format(e))
+
+
+def _handle_message(payload):
     global recent_events
 
-    logger.debug('handle_message: {}'.format(event_data))
-    message = event_data['event']
-    if message.get('subtype') is not None:
+    data = payload.get('data')
+    if not data:
+        return
+    if data.get('subtype') is not None:
         return  # https://api.slack.com/events/message#message_subtypes
-    text = message.get('text')
+    text = data.get('text')
     if not text:
         return
+    if not text.startswith(bot_mention):
+        return
 
-    timestamp = float(message.get('ts', 0))
+    logger.debug('handle_message: {}'.format(payload))
+
+    timestamp = float(data.get('ts', 0))
     if timestamp in recent_events:  # high-resolution timestamps should have few false-negatives
         logger.info('ignoring duplicate message: {}'.format(message))
         return
@@ -74,15 +78,15 @@ def handle_message(event_data):
     try:
         args = parser.parse_args(user_args)
     except HelpRequest as error:
-        handler = handle_help(slack_client=slack_client, event=event_data, subparser=error.args[0]['parser'])
+        handler = handle_help(payload=payload, subparser=error.args[0]['parser'])
     except ValueError as error:
-        handler = handle_parse_args_error(slack_client=slack_client, event=event_data, error=error)
+        handler = handle_parse_args_error(payload=payload, error=error)
     else:
         handler = args.func
         if not handler:
             logger.info('no handler found for {!r}'.format(user_args))
             return
-        response = handler(slack_client=slack_client, event=event_data, args=args, body=body)
+        response = handler(payload=payload, args=args, body=body)
         if not response:
             return
         if response.get('ok'):
@@ -91,9 +95,10 @@ def handle_message(event_data):
             logger.error(response)
 
 
-def handle_parse_args_error(slack_client, event, error):
-    channel = event['event']['channel']
-    thread = event['event'].get('thread_ts', event['event']['ts'])
+def handle_parse_args_error(payload, error):
+    web_client = payload['web_client']
+    channel = payload['data']['channel']
+    thread = payload['data'].get('thread_ts', payload['data']['ts'])
     if len(error.args) == 1:
         details = error.args[0]
     else:
@@ -105,40 +110,43 @@ def handle_parse_args_error(slack_client, event, error):
         logger.error('parse_args error had no message: {}'.format(error))
         return
 
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
 
 
-def handle_help(slack_client, event, args=None, body=None, subparser=None):
-    channel = event['event']['channel']
-    thread = event['event'].get('thread_ts', event['event']['ts'])
+def handle_help(payload, args=None, body=None, subparser=None):
+    web_client = payload['web_client']
+    channel = payload['data']['channel']
+    thread = payload['data'].get('thread_ts', payload['data']['ts'])
     if not subparser:
         subparser = parser
     message = subparser.format_help()
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
 
 
-def handle_summary(slack_client, event, args=None, body=None):
-    channel = event['event']['channel']
-    thread = event['event'].get('thread_ts', event['event']['ts'])
+def handle_summary(payload, args=None, body=None):
+    web_client = payload['web_client']
+    channel = payload['data']['channel']
+    thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
     try:
         summary, _ = get_summary(cluster=cluster, ebs_account=args.ebs_account)
     except ValueError as error:
-        return slack_client.chat_postMessage(
+        return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text=summary)
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text=summary)
 
 
-def handle_detail(slack_client, event, args=None, body=None):
-    channel = event['event']['channel']
-    thread = event['event'].get('thread_ts', event['event']['ts'])
+def handle_detail(payload, args=None, body=None):
+    web_client = payload['web_client']
+    channel = payload['data']['channel']
+    thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
     try:
         summary, notes = get_summary(cluster=cluster, ebs_account=args.ebs_account)
     except ValueError as error:
-        return slack_client.chat_postMessage(
+        return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
@@ -147,7 +155,7 @@ def handle_detail(slack_client, event, args=None, body=None):
         entries.append(
             '{subject}\n{body}'.format(**note),
         )
-    return slack_client.files_upload(channels=channel, thread_ts=thread, content='\n\n'.join(entries))
+    return web_client.files_upload(channels=channel, thread_ts=thread, content='\n\n'.join(entries))
 
 
 def get_notes(cluster, ebs_account):
@@ -184,15 +192,16 @@ def get_summary(cluster, ebs_account):
     return '\n'.join(lines), related_notes
 
 
-def handle_set_summary(slack_client, event, args=None, body=None):
-    channel = event['event']['channel']
-    thread = event['event'].get('thread_ts', event['event']['ts'])
+def handle_set_summary(payload, args=None, body=None):
+    web_client = payload['web_client']
+    channel = payload['data']['channel']
+    thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
     try:
         subject, body = body.split('\n', 1)
     except ValueError:  # subject with no body
         subject, body = body, ''
-    body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip() 
+    body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip()
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
         summary, related_notes = get_notes(cluster=cluster, ebs_account=args.ebs_account)
@@ -204,16 +213,17 @@ def handle_set_summary(slack_client, event, args=None, body=None):
         if summary:
             hydra_client.delete_account_note(account=args.ebs_account, noteID=summary['id'])
     except ValueError as error:
-        return slack_client.chat_postMessage(
+        return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='set {} summary to:\n{}\n{}'.format(cluster, subject, body))
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text='set {} summary to:\n{}\n{}'.format(cluster, subject, body))
 
 
-def handle_comment(slack_client, event, args=None, body=None):
-    channel = event['event']['channel']
-    thread = event['event'].get('thread_ts', event['event']['ts'])
+def handle_comment(payload, args=None, body=None):
+    web_client = payload['web_client']
+    channel = payload['data']['channel']
+    thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
     if not args.ebs_account:
         raise ValueError('set --ebs-account to the value from EBS Account in {}'.format(dashboard_uri(cluster=cluster)))
@@ -228,11 +238,11 @@ def handle_comment(slack_client, event, args=None, body=None):
             body=body,
         )
     except ValueError as error:
-        return slack_client.chat_postMessage(
+        return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    return slack_client.chat_postMessage(channel=channel, thread_ts=thread, text='added comment on {}:\n{}\n{}'.format(cluster, subject, body))
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text='added comment on {}:\n{}\n{}'.format(cluster, subject, body))
 
 
 parser = ErrorRaisingArgumentParser(
@@ -260,6 +270,7 @@ comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
 comment_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 comment_parser.set_defaults(func=handle_comment)
 
-# Once we have our event listeners configured, we can start the
-# Flask server with the default `/events` endpoint on port 8080
-slack_events_adapter.start(host="0.0.0.0", port=8080)
+# start the RTM socket
+rtm_client = slack.RTMClient(token=os.environ['SLACK_BOT_TOKEN'])
+logger.info("bot starting...")
+rtm_client.start()
