@@ -12,4 +12,7 @@ oc new-app https://github.com/<project>/cluster-support-bot.git \
   -e DASHBOARD=https://FIXME.example.com/somewhere-users-can-see-cluster-details?cluster-id=
 ```
 
+Optionally set `TELEMETRY_CA_CERT` to a URI serving PEM for a CA cert
+to use when validating Telemetry requests.
+
 Test by using `oc logs -f <podname>`to make sure it's running.
