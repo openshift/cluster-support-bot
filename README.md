@@ -17,7 +17,7 @@ The bot will respond with documentation for the available commands.
 When you notice a problem with a cluster, ask the bot for the current summary:
 
 ```
-@cluster-support-bot summary --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+@cluster-support-bot summary 09d9436d-52bb-48ba-9026-2ab047158ef6
 ```
 
 The bot will respond with the current cluster summary, if any.
@@ -30,7 +30,7 @@ You can also [get the detailed history](#get-the-detailed-support-history-for-a-
 When the current summary is missing or stale, ask the bot to set a new summary:
 
 ```
-@cluster-support-bot set-summary --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+@cluster-support-bot set-summary 09d9436d-52bb-48ba-9026-2ab047158ef6
 This is your subject, e.g. Cluster appears to have misconfigured ingress DNS
 This is your body, e.g. The ingress operator has not been configured to manage DNS
 records for *.apps, but it is attempting to resolve them to see whether the user-provided
@@ -54,7 +54,7 @@ You can also [comment on the cluster](#comment-on-a-cluster) without updating th
 When you want more detail than the current summary provides, ask the bot for all the details:
 
 ```
-@cluster-support-bot detail --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+@cluster-support-bot detail 09d9436d-52bb-48ba-9026-2ab047158ef6
 ```
 
 The bot will respond with the current cluster summary and any comments in reverse-chronological order.
@@ -64,7 +64,7 @@ The bot will respond with the current cluster summary and any comments in revers
 When you want to add a comment about the cluster without updating the summary:
 
 ```
-@cluster-support-bot comment --ebs-account 123 09d9436d-52bb-48ba-9026-2ab047158ef6
+@cluster-support-bot comment 09d9436d-52bb-48ba-9026-2ab047158ef6
 This is your subject, e.g. Opened support case about the missing *.apps DNS records
 This is your body, e.g. Case https://example.com/123  Customer says they may be
 able to dig into this tomorrow.

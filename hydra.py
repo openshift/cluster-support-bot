@@ -1,22 +1,8 @@
+import errors
 import requests
-
 
 requests.packages.urllib3.disable_warnings()
 __version__ = "0.1.0"
-
-
-class RequestException(ValueError):
-    def __init__(self, response):
-        super(RequestException, self).__init__(response)
-        self.response = response
-
-    def __str__(self):
-        text = self.response.text
-        if len(text) > 160:
-            text = text[:157] + '...'
-        return "failed {} -> {}\n{}".format(
-            self.response.url, self.response.status_code, text,
-        )
 
 
 class Client(object):
@@ -42,7 +28,7 @@ class Client(object):
             return
 
         if response.status_code != 200:
-            raise RequestException(response=response)
+            raise errors.RequestException(response=response)
 
         if not response.text:
             return

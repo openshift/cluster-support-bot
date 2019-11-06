@@ -5,6 +5,7 @@ import time
 
 import hydra
 import slack
+import telemetry
 
 
 logging.basicConfig()
@@ -129,7 +130,7 @@ def handle_summary(payload, args=None, body=None):
     thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
     try:
-        summary, _ = get_summary(cluster=cluster, ebs_account=args.ebs_account)
+        summary, _ = get_summary(cluster=cluster)
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
@@ -144,7 +145,7 @@ def handle_detail(payload, args=None, body=None):
     thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
     try:
-        summary, notes = get_summary(cluster=cluster, ebs_account=args.ebs_account)
+        summary, notes = get_summary(cluster=cluster)
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
@@ -159,8 +160,6 @@ def handle_detail(payload, args=None, body=None):
 
 
 def get_notes(cluster, ebs_account):
-    if not ebs_account:
-        raise ValueError('set --ebs-account to the value from EBS Account in {}'.format(dashboard_uri(cluster=cluster)))
     notes = hydra_client.get_account_notes(account=ebs_account)
     summary = None
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
@@ -177,7 +176,8 @@ def get_notes(cluster, ebs_account):
     return summary, related_notes
 
 
-def get_summary(cluster, ebs_account):
+def get_summary(cluster):
+    ebs_account = telemetry.ebs_account(cluster=cluster)
     summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
     lines = ['Cluster {}'.format(cluster)]
     lines.append('Created by Red Hat Customer Portal Account ID {}'.format(ebs_account))
@@ -204,14 +204,15 @@ def handle_set_summary(payload, args=None, body=None):
     body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip()
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
-        summary, related_notes = get_notes(cluster=cluster, ebs_account=args.ebs_account)
+        ebs_account = telemetry.ebs_account(cluster=cluster)
+        summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
         hydra_client.post_account_note(
-            account=args.ebs_account,
+            account=ebs_account,
             subject='{}{}'.format(subject_prefix, subject),
             body=body,
         )
         if summary:
-            hydra_client.delete_account_note(account=args.ebs_account, noteID=summary['id'])
+            hydra_client.delete_account_note(account=ebs_account, noteID=summary['id'])
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
@@ -225,15 +226,14 @@ def handle_comment(payload, args=None, body=None):
     channel = payload['data']['channel']
     thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
-    if not args.ebs_account:
-        raise ValueError('set --ebs-account to the value from EBS Account in {}'.format(dashboard_uri(cluster=cluster)))
     try:
         subject, body = body.split('\n', 1)
     except ValueError:  # subject with no body
         subject, body = body, ''
     try:
+        ebs_account = telemetry.ebs_account(cluster=cluster)
         hydra_client.post_account_note(
-            account=args.ebs_account,
+            account=ebs_account,
             subject='cluster {}: {}'.format(cluster, subject),
             body=body,
         )
@@ -255,19 +255,15 @@ help_parser = subparsers.add_parser('help', help='Show this help.')
 help_parser.set_defaults(func=handle_help)
 summary_parser = subparsers.add_parser('summary', help='Summarize a cluster by ID.')
 summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
-summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 summary_parser.set_defaults(func=handle_summary)
 set_summary_parser = subparsers.add_parser('set-summary', help='Set (or edit) the cluster summary.  The line following the set-summary command will be used in the summary subject, and subsequent lines will be used in the summary body.')
 set_summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
-set_summary_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 set_summary_parser.set_defaults(func=handle_set_summary)
 detail_parser = subparsers.add_parser('detail', help='Upload a file to Slack with the cluster summary and all comments.')
 detail_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
-detail_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 detail_parser.set_defaults(func=handle_detail)
 comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID.  The line following the comment command will be used in the summary subject, and subsequent lines will be used in the summary body.')
 comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
-comment_parser.add_argument('--ebs-account', metavar='ID', help='The eBusiness Suite (EBS) ID of the cluster owner.')
 comment_parser.set_defaults(func=handle_comment)
 
 # start the RTM socket
