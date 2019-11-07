@@ -20,13 +20,11 @@ if 'TELEMETRY_CA_CERT' in os.environ:
     _ADDITIONAL_REQUEST_ARGUMENTS['verify'] = _TELEMETRY_CA
 
 
-def ebs_account(cluster):
-    """Use subscription_labels to look up the eBusiness Suite ID associated with the given cluster ID.
-    """
+def _query(query):
     response = requests.get(
         URI,
         params={
-            'query': 'max by(ebs_account) (subscription_labels{{_id="{}"}})'.format(cluster),
+            'query': query,
         },
         headers = {
             'Accept': 'application/json',
@@ -43,8 +41,23 @@ def ebs_account(cluster):
     if data['status'] != 'success':
         raise errors.RequestException(response=response)
 
-    for result in data['data']['result']:
-        if result.get('metric', {}).get('ebs_account'):
-            return result['metric']['ebs_account']
+    return data
 
-    raise ValueError('no EBS account found')
+
+def subscription(cluster):
+    """Get the cluster's subscription_labels.
+    """
+    data = _query(query='topk(1, subscription_labels{{_id="{}"}})'.format(cluster))
+    if not data.get('data', {}).get('result'):
+        raise ValueError('no subscription labels found')
+
+    return data['data']['result'][0]['metric']
+
+
+def ebs_account(subscription):
+    """Use subscription_labels to look up the eBusiness Suite ID associated with the given cluster ID.
+    """
+    if not subscription.get('ebs_account'):
+        raise ValueError('no EBS account found')
+
+    return subscription['ebs_account']

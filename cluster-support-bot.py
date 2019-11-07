@@ -177,11 +177,14 @@ def get_notes(cluster, ebs_account):
 
 
 def get_summary(cluster):
-    ebs_account = telemetry.ebs_account(cluster=cluster)
+    subscription = telemetry.subscription(cluster=cluster)
+    ebs_account = telemetry.ebs_account(subscription=subscription)
     summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
     lines = ['Cluster {}'.format(cluster)]
     lines.extend([
         'Created by Red Hat Customer Portal Account ID {}'.format(ebs_account),
+        'Managed: {}'.format(subscription.get('managed', 'Unknown')),
+        'Support: {}'.format(subscription.get('support', 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.')),
         'Dashboard: {}'.format(dashboard_uri(cluster=cluster)),
     ])
     if summary:
@@ -206,8 +209,8 @@ def handle_set_summary(payload, args=None, body=None):
     body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip()
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
-        ebs_account = telemetry.ebs_account(cluster=cluster)
-        summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
+        ebs_account = telemetry.ebs_account(subscription=telemetry.subscription(cluster=cluster))
+        summary, _ = get_notes(cluster=cluster, ebs_account=ebs_account)
         hydra_client.post_account_note(
             account=ebs_account,
             subject='{}{}'.format(subject_prefix, subject),
@@ -233,7 +236,7 @@ def handle_comment(payload, args=None, body=None):
     except ValueError:  # subject with no body
         subject, body = body, ''
     try:
-        ebs_account = telemetry.ebs_account(cluster=cluster)
+        ebs_account = telemetry.ebs_account(subscription=telemetry.subscription(cluster=cluster))
         hydra_client.post_account_note(
             account=ebs_account,
             subject='cluster {}: {}'.format(cluster, subject),
