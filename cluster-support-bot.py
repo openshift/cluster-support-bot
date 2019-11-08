@@ -180,10 +180,12 @@ def get_summary(cluster):
     ebs_account = telemetry.ebs_account(cluster=cluster)
     summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
     lines = ['Cluster {}'.format(cluster)]
-    lines.append('Created by Red Hat Customer Portal Account ID {}'.format(ebs_account))
+    lines.extend([
+        'Created by Red Hat Customer Portal Account ID {}'.format(ebs_account),
+        'Dashboard: {}'.format(dashboard_uri(cluster=cluster)),
+    ])
     if summary:
         lines.extend([
-            'Dashboard: {}'.format(dashboard_uri(cluster=cluster)),
             summary['subject'],
             summary['body'],
         ])
