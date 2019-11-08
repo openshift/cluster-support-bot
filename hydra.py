@@ -80,3 +80,19 @@ class Client(object):
             endpoint="accounts/{}/notes".format(account),
             payload=content,
         )
+
+    def get_open_cases(self, account):
+        return [
+            case
+            for case in (
+                self._hydra(fn=requests.get, endpoint='cases/?accounts={}'.format(account))
+                or []
+            )
+            if not case.get('isClosed')
+        ]
+
+    def get_case_comments(self, case):
+        return (
+            self._hydra(fn=requests.get, endpoint="cases/{}/comments".format(case))
+            or []
+        )

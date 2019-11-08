@@ -183,6 +183,12 @@ def get_summary(cluster):
         'Support: {}'.format(subscription.get('support', 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.')),
     ])
     lines.extend('Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
+    cases = [
+        case
+        for case in hydra_client.get_open_cases(account=ebs_account)
+        if cluster in str(hydra_client.get_case_comments(case=case['caseNumber']))
+    ]
+    lines.extend('Case {caseNumber} ({createdDate}, {caseOwner[name]}): {subject}'.format(**case) for case in cases)
     if summary:
         lines.extend([
             summary['subject'],
