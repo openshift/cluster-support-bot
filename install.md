@@ -9,8 +9,10 @@ oc new-app https://github.com/<project>/cluster-support-bot.git \
   -e HYDRA_PASSWORD=<FIXME: how to get one of these> \
   -e TELEMETRY_URI=https://FIXME.example.com/your-telemetry-query-uri \
   -e TELEMETRY_TOKEN=<token from https://help.datahub.redhat.com/docs/interacting-with-telemetry-data> \
-  -e DASHBOARD=https://FIXME.example.com/somewhere-users-can-see-cluster-details?cluster-id=
+  -e DASHBOARDS=https://FIXME.example.com/somewhere-users-can-see-cluster-details?cluster-id=
 ```
+
+`DASHBOARDS` can have multiple, space-delimited URIs, in which case links to all of them will be provided when rendering summaries.
 
 Optionally set `TELEMETRY_CA_CERT` to a URI serving PEM for a CA cert
 to use when validating Telemetry requests.
