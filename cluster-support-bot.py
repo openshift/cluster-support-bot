@@ -18,7 +18,7 @@ bot_mention = '<@{}> '.format(os.environ['BOT_ID'])
 recent_events = set()  # cache recent event timestamps
 
 hydra_client = hydra.Client(username=os.environ['HYDRA_USER'], password=os.environ['HYDRA_PASSWORD'])
-dashboard_base = os.environ['DASHBOARD']
+dashboard_bases = [base for base in os.environ['DASHBOARDS'].split(' ') if base]
 
 
 class HelpRequest(ValueError):
@@ -35,10 +35,6 @@ class ErrorRaisingArgumentParser(argparse.ArgumentParser):
 
     def print_help(self, file=None):
         raise HelpRequest({'parser': self})
-
-
-def dashboard_uri(cluster):
-    return '{}{}'.format(dashboard_base, cluster)
 
 
 @slack.RTMClient.run_on(event='message')
@@ -185,8 +181,8 @@ def get_summary(cluster):
         'Created by Red Hat Customer Portal Account ID {}'.format(ebs_account),
         'Managed: {}'.format(subscription.get('managed', 'Unknown')),
         'Support: {}'.format(subscription.get('support', 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.')),
-        'Dashboard: {}'.format(dashboard_uri(cluster=cluster)),
     ])
+    lines.extend('Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
     if summary:
         lines.extend([
             summary['subject'],
