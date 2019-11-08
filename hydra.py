@@ -96,3 +96,18 @@ class Client(object):
             self._hydra(fn=requests.get, endpoint="cases/{}/comments".format(case))
             or []
         )
+
+    def put_case_comment(self, case, body, **kwargs):
+        content = {
+            'caseComment': {
+                'caseNumber': case,
+                'commentBody': body,
+            },
+            'additionalData': {},  # without this, Hydra dies with a NullPointerException
+        }
+        content['caseComment'].update(kwargs)
+        return self._hydra(
+            fn=requests.put,
+            endpoint='cases/v2/comments',
+            payload=content,
+        )

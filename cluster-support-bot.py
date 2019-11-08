@@ -169,13 +169,18 @@ def get_notes(cluster, ebs_account):
             continue
         summary = note
         break
-    return summary, related_notes
+    cases = [
+        case
+        for case in hydra_client.get_open_cases(account=ebs_account)
+        if cluster in str(hydra_client.get_case_comments(case=case['caseNumber']))
+    ]
+    return summary, related_notes, cases
 
 
 def get_summary(cluster):
     subscription = telemetry.subscription(cluster=cluster)
     ebs_account = telemetry.ebs_account(subscription=subscription)
-    summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
+    summary, related_notes, cases = get_notes(cluster=cluster, ebs_account=ebs_account)
     lines = ['Cluster {}'.format(cluster)]
     lines.extend([
         'Created by Red Hat Customer Portal Account ID {}'.format(ebs_account),
@@ -183,11 +188,6 @@ def get_summary(cluster):
         'Support: {}'.format(subscription.get('support', 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.')),
     ])
     lines.extend('Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
-    cases = [
-        case
-        for case in hydra_client.get_open_cases(account=ebs_account)
-        if cluster in str(hydra_client.get_case_comments(case=case['caseNumber']))
-    ]
     lines.extend('Case {caseNumber} ({createdDate}, {caseOwner[name]}): {subject}'.format(**case) for case in cases)
     if summary:
         lines.extend([
@@ -212,14 +212,16 @@ def handle_set_summary(payload, args=None, body=None):
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
         ebs_account = telemetry.ebs_account(subscription=telemetry.subscription(cluster=cluster))
-        summary, _ = get_notes(cluster=cluster, ebs_account=ebs_account)
+        summary, _, cases = get_notes(cluster=cluster, ebs_account=ebs_account)
+        subject = '{}{}'.format(subject_prefix, subject)
         hydra_client.post_account_note(
             account=ebs_account,
-            subject='{}{}'.format(subject_prefix, subject),
+            subject=subject,
             body=body,
         )
         if summary:
             hydra_client.delete_account_note(account=ebs_account, noteID=summary['id'])
+        post_case_comments(cluster=cluster, cases=cases, subject=subject, body=body)
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
@@ -239,17 +241,33 @@ def handle_comment(payload, args=None, body=None):
         subject, body = body, ''
     try:
         ebs_account = telemetry.ebs_account(subscription=telemetry.subscription(cluster=cluster))
+        _, _, cases = get_notes(cluster=cluster, ebs_account=ebs_account)
+        subject = 'cluster {}: {}'.format(cluster, subject)
         hydra_client.post_account_note(
             account=ebs_account,
-            subject='cluster {}: {}'.format(cluster, subject),
+            subject=subject,
             body=body,
         )
+        post_case_comments(cluster=cluster, cases=cases, subject=subject, body=body)
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
     return web_client.chat_postMessage(channel=channel, thread_ts=thread, text='added comment on {}:\n{}\n{}'.format(cluster, subject, body))
+
+
+def post_case_comments(cluster, cases, subject, body):
+    for case in cases:
+        hydra_client.put_case_comment(
+            case=case['caseNumber'],
+            isPublic=False,
+            body='New EBS note about cluster {} (check EBS notes for the full history):\n{}\n{}'.format(
+                cluster,
+                subject,
+                body,
+            ),
+        )
 
 
 parser = ErrorRaisingArgumentParser(
