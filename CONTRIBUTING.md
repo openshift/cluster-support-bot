@@ -7,7 +7,7 @@ This project is distributed under [the Apache License Version 2.0][LICENSE].
 * go to slack.com and create a new workspace. For example, `< your name >`
 * create your account and set your password
 * go to https://api.slack.com/apps and create a new development app. Name can be something like `< yourname > cluster support`. Choose the workspace you just created.
-* click on the app name and go to Bot Users. Add a development bot, for example, `cluster-support-bot`
+* click on the app name and go to Bot Users. Add a development bot, for example, `cluster-support`
 * click on OAuth & Permissions and install the bot to your workspace
 * copy the Bot User OAuth Access Token and export it to `SLACK_BOT_TOKEN`:
 
