@@ -172,6 +172,23 @@ def get_notes(cluster, ebs_account):
     return summary, related_notes
 
 
+def get_entitlements_summary(ebs_account):
+    entitlements = hydra_client.get_entitlements(account=ebs_account)
+    if not entitlements:
+        return 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.'
+    openshift_entitlements = ', '.join(sorted(set(
+        entitlement['supportLevel']
+        for entitlement in entitlements
+        if 'OpenShift' in entitlement['name']
+    ))) or 'None'
+    other_entitlements = ', '.join(sorted(set(
+        entitlement['supportLevel']
+        for entitlement in entitlements
+        if 'OpenShift' not in entitlement['name']
+    ))) or 'None'
+    return 'OpenShift: {}.  Other: {}'.format(openshift_entitlements, other_entitlements)
+
+
 def get_summary(cluster):
     subscription = telemetry.subscription(cluster=cluster)
     ebs_account = telemetry.ebs_account(subscription=subscription)
@@ -180,8 +197,10 @@ def get_summary(cluster):
     lines.extend([
         'Created by Red Hat Customer Portal Account ID {}'.format(ebs_account),
         'Managed: {}'.format(subscription.get('managed', 'Unknown')),
-        'Support: {}'.format(subscription.get('support', 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.')),
+        'Support: {}'.format(subscription.get('support', 'None')),
     ])
+    if not subscription.get('support'):
+        lines.append('Entitlements: {}'.format(get_entitlements_summary(ebs_account=ebs_account)))
     lines.extend('Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
     cases = [
         case
