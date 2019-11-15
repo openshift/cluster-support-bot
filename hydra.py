@@ -81,6 +81,12 @@ class Client(object):
             payload=content,
         )
 
+    def get_entitlements(self, account):
+        return (
+            self._hydra(fn=requests.get, endpoint="/entitlements/account/{}".format(account))
+            or []
+        )
+
     def get_open_cases(self, account):
         return [
             case
