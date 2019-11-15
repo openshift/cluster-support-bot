@@ -18,3 +18,8 @@ Optionally set `TELEMETRY_CA_CERT` to a URI serving PEM for a CA cert
 to use when validating Telemetry requests.
 
 Test by using `oc logs -f <podname>`to make sure it's running.
+
+## Expose the route
+```sh
+oc create route edge --service=cluster-support-bot
+```

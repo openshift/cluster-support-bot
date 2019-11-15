@@ -1,11 +1,24 @@
 import argparse
 import logging
 import os
+import re
 import time
 
-import hydra
+import prometheus_client
 import slack
+
+import hydra
 import telemetry
+
+
+mention_counter = prometheus_client.Counter('cluster_support_mentions',
+        'Number of times a cluster is mentioned where the cluster-support bot is listening', ['_id'])
+comment_counter = prometheus_client.Counter('cluster_support_comments',
+        'Number of times a cluster has been commented via the cluster-support bot', ['_id'])
+# Eventually we'll likely switch to some sort of wsgi app but for now any path
+# requested will return our metrics.  We'll configure /metrics to be scrapped
+# so we can leave room for some sort of landing page in the future.
+prometheus_client.start_http_server(8080)
 
 
 logging.basicConfig()
@@ -14,6 +27,7 @@ logger.setLevel(logging.DEBUG)
 
 
 bot_mention = '<@{}> '.format(os.environ['BOT_ID'])
+uuid_re = re.compile('.*([a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}).*', re.I)
 
 recent_events = set()  # cache recent event timestamps
 
@@ -56,6 +70,7 @@ def _handle_message(payload):
     text = data.get('text')
     if not text:
         return
+    handle_uuid_mention(text)
     if not text.startswith(bot_mention):
         return
 
@@ -90,6 +105,14 @@ def _handle_message(payload):
             logger.debug(response)
         else:
             logger.error(response)
+
+
+def handle_uuid_mention(text):
+    match = uuid_re.match(text)
+    if match:
+        uuid = match.groups()[0]
+        logger.debug('{} mention'.format(uuid))
+        mention_counter.labels(uuid).inc()
 
 
 def handle_parse_args_error(payload, error):
@@ -239,6 +262,7 @@ def handle_set_summary(payload, args=None, body=None):
         )
         if summary:
             hydra_client.delete_account_note(account=ebs_account, noteID=summary['id'])
+        comment_counter.labels(cluster).inc()
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
@@ -263,6 +287,7 @@ def handle_comment(payload, args=None, body=None):
             subject='cluster {}: {}'.format(cluster, subject),
             body=body,
         )
+        comment_counter.labels(cluster).inc()
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
