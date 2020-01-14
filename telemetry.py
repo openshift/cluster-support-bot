@@ -47,7 +47,7 @@ def _query(query):
 def subscription(cluster):
     """Get the cluster's subscription_labels.
     """
-    data = _query(query='topk(1, subscription_labels{{_id="{}"}})'.format(cluster))
+    data = _query(query='topk(1, subscription_labels{{_id="{}"}} offset 3h)'.format(cluster))
     if not data.get('data', {}).get('result'):
         raise ValueError('no subscription labels found')
 
