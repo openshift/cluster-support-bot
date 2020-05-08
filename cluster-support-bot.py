@@ -10,7 +10,6 @@ import slack
 import hydra
 import telemetry
 
-
 mention_counter = prometheus_client.Counter('cluster_support_mentions',
         'Number of times a cluster is mentioned where the cluster-support bot is listening', ['_id'])
 comment_counter = prometheus_client.Counter('cluster_support_comments',
@@ -143,19 +142,44 @@ def handle_help(payload, args=None, body=None, subparser=None):
     return web_client.chat_postMessage(channel=channel, thread_ts=thread, text=message)
 
 
+def _block_from_text(line):
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": line
+        }
+    }
+
+
+def _summary_to_text(summary):
+    if not summary:
+        return "No summary"
+    lines = []
+    for line in summary:
+        lines.extend([
+            line['subject'],
+            line['body'],
+        ])
+    return "\n".join(lines)
+
+
 def handle_summary(payload, args=None, body=None):
     web_client = payload['web_client']
     channel = payload['data']['channel']
     thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
+    blocks = []
     try:
-        summary, _ = get_summary(cluster=cluster)
+        info, _,  _ = get_summary(cluster=cluster)
+        for line in info:
+            blocks.append(_block_from_text(line))
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text=summary)
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, blocks=blocks)
 
 
 def handle_detail(payload, args=None, body=None):
@@ -163,19 +187,22 @@ def handle_detail(payload, args=None, body=None):
     channel = payload['data']['channel']
     thread = payload['data'].get('thread_ts', payload['data']['ts'])
     cluster = args.cluster
+    blocks = []
     try:
-        summary, notes = get_summary(cluster=cluster)
+        info, summary, notes = get_summary(cluster=cluster)
+        for line in info:
+            blocks.append(_block_from_text(line))
+        for line in summary:
+            blocks.append(_block_from_text(line))
+        if notes:
+            notes_text = _summary_to_text(notes)
+            blocks.append(_block_from_text(notes_text))
     except ValueError as error:
         return web_client.chat_postMessage(
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    entries = [summary]
-    for note in notes:
-        entries.append(
-            '{subject}\n{body}'.format(**note),
-        )
-    return web_client.files_upload(channels=channel, thread_ts=thread, content='\n\n'.join(entries))
+    return web_client.chat_postMessage(channel=channel, thread_ts=thread, blocks=blocks)
 
 
 def get_notes(cluster, ebs_account):
@@ -231,14 +258,13 @@ def get_summary(cluster):
         if cluster in str(hydra_client.get_case_comments(case=case['caseNumber']))
     ]
     lines.extend('Case {caseNumber} ({createdDate}, {caseOwner[name]}): {subject}'.format(**case) for case in cases)
+    existing_summary = []
     if summary:
-        lines.extend([
+        existing_summary.extend([
             summary['subject'],
             summary['body'],
         ])
-    else:
-        lines.append('No summary')
-    return '\n'.join(lines), related_notes
+    return lines, existing_summary, related_notes
 
 
 def handle_set_summary(payload, args=None, body=None):
