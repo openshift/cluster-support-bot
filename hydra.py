@@ -1,9 +1,13 @@
 import errors
 import requests
+import datetime
 
 requests.packages.urllib3.disable_warnings()
 __version__ = "0.1.0"
 
+defaultExpiryPeriod = {
+    'year': 1
+}
 
 class Client(object):
     def __init__(self, username, password):
@@ -50,7 +54,11 @@ class Client(object):
         retired=False,
         subject="",
         noteType="General Info",
+        expiryDate=None
     ):
+        if not expiryDate:
+            today = datetime.date.today()
+            expiryDate = today + datetime.timedelta(**defaultExpiryPeriod)
         content = {
             "note": {
                 "body": body,
@@ -62,6 +70,7 @@ class Client(object):
                 # We likely will want to use "General Info" for most notes, but possibly use "Key Notes" for summaries
                 "type": noteType,
                 "subject": subject,
+                "expiryDate": expiryDate,
             }
         }
         if intendedReviewDate:
