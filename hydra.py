@@ -6,7 +6,7 @@ requests.packages.urllib3.disable_warnings()
 __version__ = "0.1.0"
 
 defaultExpiryPeriod = {
-    'year': 1
+    'days': 365
 }
 
 class Client(object):
