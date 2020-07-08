@@ -70,7 +70,7 @@ class Client(object):
                 # We likely will want to use "General Info" for most notes, but possibly use "Key Notes" for summaries
                 "type": noteType,
                 "subject": subject,
-                "expiryDate": expiryDate,
+                "expiryDate": expiryDate.isoformat(),
             }
         }
         if intendedReviewDate:
