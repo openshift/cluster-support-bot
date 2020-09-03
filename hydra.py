@@ -40,9 +40,6 @@ class Client(object):
         return response.json()
 
     def get_account_notes(self, account):
-        # Adding this additional check to force the (seemingly) random chance of the account showing up as a float (producing the extra .0) into the correct format
-        if isinstance(account, float):
-            account = str(int(account))
         return (
             self._hydra(fn=requests.get, endpoint="accounts/{}/notes".format(account))
             or []

@@ -60,4 +60,4 @@ def ebs_account(subscription):
     if not subscription.get('ebs_account'):
         raise ValueError('no EBS account found')
 
-    return subscription['ebs_account']
+    return int(subscription['ebs_account'])
