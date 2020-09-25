@@ -49,7 +49,6 @@ class Client(object):
         self,
         account,
         body="",
-        intendedReviewDate=None,
         needsReview=False,
         retired=False,
         subject="",
@@ -73,8 +72,6 @@ class Client(object):
                 "expiryDate": expiryDate.isoformat(),
             }
         }
-        if intendedReviewDate:
-            content["note"].update({"intendedReviewDate": intendedReviewDate})
 
         return self._hydra(
             fn=requests.post,
