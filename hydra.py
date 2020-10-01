@@ -50,10 +50,11 @@ class Client(object):
         account,
         body="",
         needsReview=False,
+        needsReviewByAuthor=False,
         retired=False,
         subject="",
         noteType="General Info",
-        expiryDate=None
+        expiryDate=None,
     ):
         if not expiryDate:
             today = datetime.date.today()
@@ -62,6 +63,7 @@ class Client(object):
             "note": {
                 "body": body,
                 "needsReview": needsReview,
+                "needsReviewByAuthor": needsReviewByAuthor,
                 "retired": retired,
                 # There are 4 types of account notes:
                 # General Info, Key Notes, Next Steps, and Others
