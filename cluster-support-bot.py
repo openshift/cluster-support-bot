@@ -70,20 +70,17 @@ async def _handle_message(msg_id, payload):
     # https://api.slack.com/events/message#message_subtypes
     msg_subtype = payload['data'].get('subtype')
     if msg_subtype is not None:
-        logger.debug("msg id {}: invalid subtype '{}'".format(msg_id, msg_subtype))
         return
 
     text = payload['data'].get('text')
     if not text:
-        logger.debug("msg id {}: empty text".format(msg_id))
         return
-
-    logger.debug("msg id {}: parsing '{}'".format(msg_id, text))
 
     handle_uuid_mention(text)
     if not text.startswith(bot_mention):
-        logger.debug("msg id {}: not prefixed with bot ID".format(msg_id))
         return
+
+    logger.debug("msg id {}: parsing '{}'".format(msg_id, text))
 
     user_arg_line, body = (text.strip()+'\n').split('\n', 1)
     user_args = user_arg_line.split()[1:]  # split and drop the '<@{bot-id}>' prefix
