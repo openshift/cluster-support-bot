@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import time
+import unicodedata
 
 import prometheus_client
 import slack
@@ -58,7 +59,6 @@ def handle_message(**payload):
         message_id = payload['data'].get('client_msg_id')
         if not message_id:
             return
-        logger.debug("Received message id {}:\n{}".format(message_id, payload))
         asyncio.ensure_future(
             _handle_message(msg_id=message_id, payload=payload),
             loop=asyncio.get_event_loop())
@@ -72,9 +72,11 @@ async def _handle_message(msg_id, payload):
     if msg_subtype is not None:
         return
 
-    text = payload['data'].get('text')
-    if not text:
+    original_text = payload['data'].get('text')
+    if not original_text:
         return
+
+    text = unicodedata.normalize("NFKD", original_text)
 
     handle_uuid_mention(text)
     if not text.startswith(bot_mention):
@@ -108,7 +110,6 @@ def handle_uuid_mention(text):
     match = uuid_re.match(text)
     if match:
         uuid = match.groups()[0]
-        logger.debug('{} mention'.format(uuid))
         mention_counter.labels(uuid).inc()
 
 
