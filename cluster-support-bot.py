@@ -97,6 +97,7 @@ async def _handle_message(msg_id, payload):
         if not handler:
             logger.info('no handler found for {!r}'.format(user_args))
             return
+        logger.info('msg id {}: running handler {}'.format(msg_id, handler.__name__))
         response = handler(payload=payload, args=args, body=body)
         if not response:
             return
