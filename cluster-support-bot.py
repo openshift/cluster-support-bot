@@ -54,8 +54,10 @@ class ErrorRaisingArgumentParser(argparse.ArgumentParser):
 @slack.RTMClient.run_on(event='message')
 def handle_message(**payload):
     try:
-        # Throw exception if the message doesn't have ID
-        message_id = payload['data']['client_msg_id']
+        # Exit if the message doesn't have ID
+        message_id = payload['data'].get('client_msg_id')
+        if not message_id:
+            return
         logger.debug("Received message id {}:\n{}".format(message_id, payload))
         asyncio.ensure_future(
             _handle_message(msg_id=message_id, payload=payload),
