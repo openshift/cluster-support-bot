@@ -44,10 +44,11 @@ def _query(query):
     return data
 
 
-def subscription(cluster):
+def subscription(cluster, labels=None):
     """Get the cluster's subscription_labels.
     """
-    data = _query(query='topk(1, max_over_time(subscription_labels{{_id="{}",support!=""}}[1w]))'.format(cluster))
+    data = _query(query='group by ({}) (max_over_time(subscription_labels{{_id="{}",support!=""}}[60h]))'.format(','.join(sorted(labels)), cluster))
+
     if not data.get('data', {}).get('result'):
         raise ValueError('no subscription labels found')
 
