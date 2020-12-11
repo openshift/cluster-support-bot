@@ -1,8 +1,10 @@
+import asyncio
 import argparse
 import logging
 import os
 import re
 import time
+import unicodedata
 
 import prometheus_client
 import slack
@@ -53,36 +55,34 @@ class ErrorRaisingArgumentParser(argparse.ArgumentParser):
 @slack.RTMClient.run_on(event='message')
 def handle_message(**payload):
     try:
-        _handle_message(payload=payload)
+        # Exit if the message doesn't have ID
+        message_id = payload['data'].get('client_msg_id')
+        if not message_id:
+            return
+        asyncio.ensure_future(
+            _handle_message(msg_id=message_id, payload=payload),
+            loop=asyncio.get_event_loop())
     except Exception as e:
         logger.debug('uncaught Exception in handle_message: {}'.format(e))
 
 
-def _handle_message(payload):
-    global recent_events
+async def _handle_message(msg_id, payload):
+    # https://api.slack.com/events/message#message_subtypes
+    msg_subtype = payload['data'].get('subtype')
+    if msg_subtype is not None:
+        return
 
-    data = payload.get('data')
-    if not data:
+    original_text = payload['data'].get('text')
+    if not original_text:
         return
-    if data.get('subtype') is not None:
-        return  # https://api.slack.com/events/message#message_subtypes
-    text = data.get('text')
-    if not text:
-        return
+
+    text = unicodedata.normalize("NFKD", original_text)
+
     handle_uuid_mention(text)
     if not text.startswith(bot_mention):
         return
 
-    logger.debug('handle_message: {}'.format(payload))
-
-    timestamp = float(data.get('ts', 0))
-    if timestamp in recent_events:  # high-resolution timestamps should have few false-negatives
-        logger.info('ignoring duplicate message: {}'.format(message))
-        return
-
-    recent_events.add(timestamp)  # add after check without a lock should be a small race window
-    cutoff = time.time() - 60*60  # keep events for an hour
-    recent_events = {timestamp for timestamp in recent_events if timestamp > cutoff}
+    logger.debug("msg id {}: parsing '{}'".format(msg_id, text))
 
     user_arg_line, body = (text.strip()+'\n').split('\n', 1)
     user_args = user_arg_line.split()[1:]  # split and drop the '<@{bot-id}>' prefix
@@ -97,6 +97,7 @@ def _handle_message(payload):
         if not handler:
             logger.info('no handler found for {!r}'.format(user_args))
             return
+        logger.info('msg id {}: running handler {}'.format(msg_id, handler.__name__))
         response = handler(payload=payload, args=args, body=body)
         if not response:
             return
@@ -110,7 +111,6 @@ def handle_uuid_mention(text):
     match = uuid_re.match(text)
     if match:
         uuid = match.groups()[0]
-        logger.debug('{} mention'.format(uuid))
         mention_counter.labels(uuid).inc()
 
 

@@ -31,6 +31,7 @@ def _query(query):
             'Authorization': 'Bearer {}'.format(TOKEN),
             'User-Agent': 'cluster-support-bot/{}'.format(__version__),
         },
+        timeout=60,
         **_ADDITIONAL_REQUEST_ARGUMENTS,
     )
 
