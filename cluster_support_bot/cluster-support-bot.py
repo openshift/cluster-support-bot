@@ -9,8 +9,8 @@ import unicodedata
 import prometheus_client
 import slack
 
-import hydra
-import telemetry
+from . import hydra
+from . import telemetry
 
 mention_counter = prometheus_client.Counter('cluster_support_mentions',
         'Number of times a cluster is mentioned where the cluster-support bot is listening', ['_id'])

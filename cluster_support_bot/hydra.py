@@ -1,4 +1,4 @@
-import errors
+from . import errors
 import requests
 import datetime
 
