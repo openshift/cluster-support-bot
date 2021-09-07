@@ -1,5 +1,6 @@
 class RequestException(ValueError):
     "Helper for formatting requests errors"
+
     def __init__(self, response):
         super(RequestException, self).__init__(response)
         self.response = response

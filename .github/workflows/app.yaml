@@ -31,3 +31,7 @@ jobs:
         if: steps.cache-pipenv.outputs.cache-hit != 'true'
         run: |
           pipenv install --deploy --dev
+
+      - name: Run linter
+        run: |
+          pipenv run flake8 cluster_support_bot

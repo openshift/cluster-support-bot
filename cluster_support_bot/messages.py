@@ -1,22 +1,21 @@
-import asyncio
 import argparse
 import logging
 import os
 import re
-import time
 import unicodedata
 
-import prometheus_client
-import slack
-
-from . import hydra
-from . import telemetry
+from cluster_support_bot import telemetry
 
 hydra_client = None
 mention_counter = None
 comment_counter = None
 
-uuid_re = re.compile('.*([a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}).*', re.I)
+uuid_re = re.compile(
+    '.*([a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}).*', re.I)
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class HelpRequest(ValueError):
@@ -199,7 +198,8 @@ def get_notes(cluster, ebs_account):
 def get_entitlements_summary(ebs_account):
     entitlements = hydra_client.get_entitlements(account=ebs_account)
     if not entitlements:
-        return 'None.  Customer Experience and Engagement (CEE) will not be able to open support cases.'
+        return 'None.  Customer Experience and Engagement (CEE) will not be able '\
+            'to open support cases.'
     openshift_entitlements = ', '.join(sorted(set(
         entitlement['supportLevel']
         for entitlement in entitlements
@@ -214,7 +214,8 @@ def get_entitlements_summary(ebs_account):
 
 
 def get_summary(cluster):
-    subscription = telemetry.subscription(cluster=cluster, labels={'ebs_account', 'managed', 'support'})
+    subscription = telemetry.subscription(
+        cluster=cluster, labels={'ebs_account', 'managed', 'support'})
     ebs_account = telemetry.ebs_account(subscription=subscription)
     summary, related_notes = get_notes(cluster=cluster, ebs_account=ebs_account)
     lines = ['Cluster {}'.format(cluster)]
@@ -227,13 +228,16 @@ def get_summary(cluster):
         lines.append('Entitlements: {}'.format(get_entitlements_summary(ebs_account=ebs_account)))
 
     dashboard_bases = [base for base in os.environ['DASHBOARDS'].split(' ') if base]
-    lines.extend('Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
+    lines.extend(
+        'Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
     cases = [
         case
         for case in hydra_client.get_open_cases(account=ebs_account)
         if cluster in str(hydra_client.get_case_comments(case=case['caseNumber']))
     ]
-    lines.extend('Case {caseNumber} ({createdDate}, {caseOwner[name]}): {subject}'.format(**case) for case in cases)
+    lines.extend(
+        'Case {caseNumber} ({createdDate}, {caseOwner[name]}): {subject}'.format(**case)
+        for case in cases)
     existing_summary = []
     if summary:
         existing_summary.extend([
@@ -252,10 +256,14 @@ def handle_set_summary(payload, args=None, body=None):
         subject, body = body.split('\n', 1)
     except ValueError:  # subject with no body
         subject, body = body, ''
-    body = (body.strip() + '\n\nThis summary was created by the cluster-support bot.  Workflow docs in https://github.com/openshift/cluster-support-bot/').strip()
+    body = (
+        body.strip() + '\n\nThis summary was created by the cluster-support bot. '
+                       'Workflow docs in https://github.com/openshift/cluster-support-bot/'
+    ).strip()
     subject_prefix = 'Summary (cluster {}): '.format(cluster)
     try:
-        ebs_account = telemetry.ebs_account(subscription=telemetry.subscription(cluster=cluster, labels={'ebs_account'}))
+        ebs_account = telemetry.ebs_account(
+            subscription=telemetry.subscription(cluster=cluster, labels={'ebs_account'}))
         summary, _ = get_notes(cluster=cluster, ebs_account=ebs_account)
         hydra_client.post_account_note(
             account=ebs_account,
@@ -270,7 +278,9 @@ def handle_set_summary(payload, args=None, body=None):
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text='set {} summary to:\n{}\n{}'.format(cluster, subject, body))
+    return web_client.chat_postMessage(
+        channel=channel, thread_ts=thread,
+        text='set {} summary to:\n{}\n{}'.format(cluster, subject, body))
 
 
 def handle_comment(payload, args=None, body=None):
@@ -283,7 +293,8 @@ def handle_comment(payload, args=None, body=None):
     except ValueError:  # subject with no body
         subject, body = body, ''
     try:
-        ebs_account = telemetry.ebs_account(subscription=telemetry.subscription(cluster=cluster, labels={'ebs_account'}))
+        ebs_account = telemetry.ebs_account(
+            subscription=telemetry.subscription(cluster=cluster, labels={'ebs_account'}))
         hydra_client.post_account_note(
             account=ebs_account,
             subject='cluster {}: {}'.format(cluster, subject),
@@ -295,12 +306,15 @@ def handle_comment(payload, args=None, body=None):
             channel=channel,
             thread_ts=thread,
             text='{} {}'.format(cluster, error))
-    return web_client.chat_postMessage(channel=channel, thread_ts=thread, text='added comment on {}:\n{}\n{}'.format(cluster, subject, body))
+    return web_client.chat_postMessage(
+        channel=channel, thread_ts=thread,
+        text='added comment on {}:\n{}\n{}'.format(cluster, subject, body))
 
 
 parser = ErrorRaisingArgumentParser(
     prog='Cluster support bot',
-    description='I help you collaborate on per-cluster support issues ( https://github.com/openshift/cluster-support-bot/ ).',
+    description='I help you collaborate on per-cluster support issues '
+                '( https://github.com/openshift/cluster-support-bot/ ).',
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 subparsers = parser.add_subparsers()
@@ -309,12 +323,20 @@ help_parser.set_defaults(func=handle_help)
 summary_parser = subparsers.add_parser('summary', help='Summarize a cluster by ID.')
 summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
 summary_parser.set_defaults(func=handle_summary)
-set_summary_parser = subparsers.add_parser('set-summary', help='Set (or edit) the cluster summary.  The line following the set-summary command will be used in the summary subject, and subsequent lines will be used in the summary body.')
+set_summary_parser = subparsers.add_parser(
+    'set-summary',
+    help='Set (or edit) the cluster summary.'
+    'The line following the set-summary command will be used in the summary subject, '
+    'and subsequent lines will be used in the summary body.')
 set_summary_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
 set_summary_parser.set_defaults(func=handle_set_summary)
-detail_parser = subparsers.add_parser('detail', help='Upload a file to Slack with the cluster summary and all comments.')
+detail_parser = subparsers.add_parser(
+    'detail', help='Upload a file to Slack with the cluster summary and all comments.')
 detail_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
 detail_parser.set_defaults(func=handle_detail)
-comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID.  The line following the comment command will be used in the summary subject, and subsequent lines will be used in the summary body.')
+comment_parser = subparsers.add_parser(
+    'comment',
+    help='Add a comment on a cluster by ID.  The line following the comment command will be used '
+    'in the summary subject, and subsequent lines will be used in the summary body.')
 comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
 comment_parser.set_defaults(func=handle_comment)

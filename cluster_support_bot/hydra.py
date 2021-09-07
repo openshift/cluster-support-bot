@@ -1,4 +1,4 @@
-from . import errors
+from cluster_support_bot import errors
 import requests
 import datetime
 
@@ -8,6 +8,7 @@ __version__ = "0.1.0"
 defaultExpiryPeriod = {
     'days': 90
 }
+
 
 class Client(object):
     def __init__(self, username, password):
@@ -68,7 +69,8 @@ class Client(object):
                 # There are 4 types of account notes:
                 # General Info, Key Notes, Next Steps, and Others
                 # Defaulting to "General Info" in order to default to a smaller note
-                # We likely will want to use "General Info" for most notes, but possibly use "Key Notes" for summaries
+                # We likely will want to use "General Info" for most notes,
+                # but possibly use "Key Notes" for summaries
                 "type": noteType,
                 "subject": subject,
                 "expiryDate": expiryDate.isoformat(),

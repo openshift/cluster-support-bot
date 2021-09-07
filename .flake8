@@ -2,4 +2,4 @@
 extend-ignore = E402
 max-line-length = 100
 exclude = tests/*
-max-complexity = 10
+max-complexity = 100

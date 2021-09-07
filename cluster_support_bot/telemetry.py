@@ -1,6 +1,6 @@
 import os
 
-import errors
+from cluster_support_bot import errors
 import requests
 
 
@@ -26,7 +26,7 @@ def _query(query):
         params={
             'query': query,
         },
-        headers = {
+        headers={
             'Accept': 'application/json',
             'Authorization': 'Bearer {}'.format(TOKEN),
             'User-Agent': 'cluster-support-bot/{}'.format(__version__),
@@ -48,7 +48,9 @@ def _query(query):
 def subscription(cluster, labels=None):
     """Get the cluster's subscription_labels.
     """
-    data = _query(query='group by ({}) (max_over_time(subscription_labels{{_id="{}",support!=""}}[60h]))'.format(','.join(sorted(labels)), cluster))
+    data = _query(
+        query='group by ({}) (max_over_time(subscription_labels{{_id="{}",support!=""}}[60h]))'
+        .format(','.join(sorted(labels)), cluster))
 
     if not data.get('data', {}).get('result'):
         raise ValueError('no subscription labels found')
