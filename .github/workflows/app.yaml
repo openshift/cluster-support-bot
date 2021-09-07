@@ -35,3 +35,7 @@ jobs:
       - name: Run linter
         run: |
           pipenv run flake8 cluster_support_bot
+
+      - name: Run unit tests
+        run: |
+          pipenv run python -m unittest
