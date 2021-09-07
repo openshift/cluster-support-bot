@@ -1,3 +1,0 @@
-prometheus_client
-requests
-slackclient>=2.0.0
