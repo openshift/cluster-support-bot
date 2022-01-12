@@ -50,7 +50,9 @@ async def _handle_message(msg_id, payload):
 
     text = unicodedata.normalize("NFKD", original_text)
 
-    handle_uuid_mention(text)
+    uuid = handle_uuid_mention(text)
+    if not uuid:
+        return
     if not text.startswith(bot_mention):
         return
 
@@ -84,6 +86,7 @@ def handle_uuid_mention(text):
     if match:
         uuid = match.groups()[0]
         mention_counter.labels(uuid).inc()
+        return uuid
 
 
 def handle_parse_args_error(payload, error):
