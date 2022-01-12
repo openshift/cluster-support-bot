@@ -16,10 +16,7 @@ hydra_client = None
 mention_counter = None
 comment_counter = None
 
-bot_mention = '<@{}> '.format(os.environ['BOT_ID'])
 uuid_re = re.compile('.*([a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}).*', re.I)
-
-dashboard_bases = [base for base in os.environ['DASHBOARDS'].split(' ') if base]
 
 
 class HelpRequest(ValueError):
@@ -53,6 +50,8 @@ async def _handle_message(msg_id, payload):
     uuid = handle_uuid_mention(text)
     if not uuid:
         return
+
+    bot_mention = '<@{}> '.format(os.environ['BOT_ID'])
     if not text.startswith(bot_mention):
         return
 
@@ -226,6 +225,8 @@ def get_summary(cluster):
     ])
     if not subscription.get('support'):
         lines.append('Entitlements: {}'.format(get_entitlements_summary(ebs_account=ebs_account)))
+
+    dashboard_bases = [base for base in os.environ['DASHBOARDS'].split(' ') if base]
     lines.extend('Dashboard: {}{}'.format(dashboard_base, cluster) for dashboard_base in dashboard_bases)
     cases = [
         case

@@ -5,22 +5,22 @@ import requests
 
 
 __version__ = '0.0.1'
-URI = os.environ['TELEMETRY_URI']
-TOKEN = os.environ['TELEMETRY_TOKEN']
-
-
-_ADDITIONAL_REQUEST_ARGUMENTS = {}
-if 'TELEMETRY_CA_CERT' in os.environ:
-    _response = requests.get(os.environ['TELEMETRY_CA_CERT'])
-    if _response.status_code != 200:
-        raise errors.RequestException(response=_response)
-    _TELEMETRY_CA = '/tmp/telemetry-ca-cert.pem'
-    with open(_TELEMETRY_CA, 'w') as f:
-        f.write(_response.text)
-    _ADDITIONAL_REQUEST_ARGUMENTS['verify'] = _TELEMETRY_CA
 
 
 def _query(query):
+    URI = os.environ['TELEMETRY_URI']
+    TOKEN = os.environ['TELEMETRY_TOKEN']
+
+    _ADDITIONAL_REQUEST_ARGUMENTS = {}
+    if 'TELEMETRY_CA_CERT' in os.environ:
+        _response = requests.get(os.environ['TELEMETRY_CA_CERT'])
+        if _response.status_code != 200:
+            raise errors.RequestException(response=_response)
+        _TELEMETRY_CA = '/tmp/telemetry-ca-cert.pem'
+        with open(_TELEMETRY_CA, 'w') as f:
+            f.write(_response.text)
+        _ADDITIONAL_REQUEST_ARGUMENTS['verify'] = _TELEMETRY_CA
+
     response = requests.get(
         URI,
         params={
