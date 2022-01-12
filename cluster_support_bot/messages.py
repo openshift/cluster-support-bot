@@ -12,27 +12,13 @@ import slack
 from . import hydra
 from . import telemetry
 
-mention_counter = prometheus_client.Counter('cluster_support_mentions',
-        'Number of times a cluster is mentioned where the cluster-support bot is listening', ['_id'])
-comment_counter = prometheus_client.Counter('cluster_support_comments',
-        'Number of times a cluster has been commented via the cluster-support bot', ['_id'])
-# Eventually we'll likely switch to some sort of wsgi app but for now any path
-# requested will return our metrics.  We'll configure /metrics to be scrapped
-# so we can leave room for some sort of landing page in the future.
-prometheus_client.start_http_server(8080)
-
-
-logging.basicConfig()
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
+hydra_client = None
+mention_counter = None
+comment_counter = None
 
 bot_mention = '<@{}> '.format(os.environ['BOT_ID'])
 uuid_re = re.compile('.*([a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}).*', re.I)
 
-recent_events = set()  # cache recent event timestamps
-
-hydra_client = hydra.Client(username=os.environ['HYDRA_USER'], password=os.environ['HYDRA_PASSWORD'])
 dashboard_bases = [base for base in os.environ['DASHBOARDS'].split(' ') if base]
 
 
@@ -50,20 +36,6 @@ class ErrorRaisingArgumentParser(argparse.ArgumentParser):
 
     def print_help(self, file=None):
         raise HelpRequest({'parser': self})
-
-
-@slack.RTMClient.run_on(event='message')
-def handle_message(**payload):
-    try:
-        # Exit if the message doesn't have ID
-        message_id = payload['data'].get('client_msg_id')
-        if not message_id:
-            return
-        asyncio.ensure_future(
-            _handle_message(msg_id=message_id, payload=payload),
-            loop=asyncio.get_event_loop())
-    except Exception as e:
-        logger.debug('uncaught Exception in handle_message: {}'.format(e))
 
 
 async def _handle_message(msg_id, payload):
@@ -342,8 +314,3 @@ detail_parser.set_defaults(func=handle_detail)
 comment_parser = subparsers.add_parser('comment', help='Add a comment on a cluster by ID.  The line following the comment command will be used in the summary subject, and subsequent lines will be used in the summary body.')
 comment_parser.add_argument('cluster', metavar='ID', help='The cluster ID.')
 comment_parser.set_defaults(func=handle_comment)
-
-# start the RTM socket
-rtm_client = slack.RTMClient(token=os.environ['SLACK_BOT_TOKEN'])
-logger.info("bot starting...")
-rtm_client.start()
