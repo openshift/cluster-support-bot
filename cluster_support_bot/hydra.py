@@ -53,7 +53,7 @@ class Client(object):
         needsReviewByAuthor=False,
         retired=False,
         subject="",
-        noteType="General Info",
+        noteType="Technical Note",
         expiryDate=None,
     ):
         if not expiryDate:
@@ -65,10 +65,11 @@ class Client(object):
                 "needsReview": needsReview,
                 "needsReviewByAuthor": needsReviewByAuthor,
                 "retired": retired,
-                # There are 4 types of account notes:
-                # General Info, Key Notes, Next Steps, and Others
-                # Defaulting to "General Info" in order to default to a smaller note
-                # We likely will want to use "General Info" for most notes, but possibly use "Key Notes" for summaries
+                # There are 5 types of account notes:
+                # General Info, Key Notes, Next Steps, Others, and Technical Note
+                # Per discussion with the Red Hat Workflow and Tooling team, we will use the "Technical Note" as this
+                # note was created to share important notes regarding custom configuration or other related technical information.
+                # This type will present itself in the customer's cases but will NOT trigger the "Special Handling" flag that prevented the use of "Key Notes".
                 "type": noteType,
                 "subject": subject,
                 "expiryDate": expiryDate.isoformat(),
